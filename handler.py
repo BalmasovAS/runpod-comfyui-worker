@@ -16,167 +16,51 @@ COMFYUI_URL = f"http://127.0.0.1:{COMFYUI_PORT}"
 RUNPOD_VOLUME_PATH = os.environ.get("RUNPOD_VOLUME_PATH", "/runpod-volume")
 COMFYUI_MODELS_PATH = os.path.join(COMFYUI_DIR, "models")
 
-def list_directory_recursive(path, max_depth=3, current_depth=0, prefix=""):
-    """Рекурсивно выводит содержимое директории"""
-    if current_depth >= max_depth:
-        return
-    
-    try:
-        items = sorted(os.listdir(path))
-        for i, item in enumerate(items):
-            is_last = i == len(items) - 1
-            item_path = os.path.join(path, item)
-            
-            if os.path.isdir(item_path):
-                connector = "└── " if is_last else "├── "
-                print(f"{prefix}{connector}📁 {item}/")
-                
-                next_prefix = prefix + ("    " if is_last else "│   ")
-                list_directory_recursive(item_path, max_depth, current_depth + 1, next_prefix)
-            else:
-                connector = "└── " if is_last else "├── "
-                size = os.path.getsize(item_path)
-                size_str = f"({size / (1024*1024*1024):.2f} GB)" if size > 1024*1024*1024 else f"({size / (1024*1024):.2f} MB)" if size > 1024*1024 else f"({size / 1024:.2f} KB)"
-                print(f"{prefix}{connector}📄 {item} {size_str}")
-    except PermissionError:
-        print(f"{prefix}⚠️ Нет доступа к {path}")
-    except Exception as e:
-        print(f"{prefix}❌ Ошибка: {e}")
-
-def check_network_volume_contents(volume_path):
-    """Проверяет содержимое Network Volume и выводит детальную информацию"""
-    print("\n" + "="*60)
-    print("📋 СОДЕРЖИМОЕ NETWORK VOLUME")
-    print("="*60)
-    print(f"Путь: {volume_path}\n")
-    
-    try:
-        # Выводим структуру директории
-        list_directory_recursive(volume_path, max_depth=4)
-        
-        # Детальная проверка папки models
-        models_path = os.path.join(volume_path, "models") if "models" not in os.path.basename(volume_path) else volume_path
-        
-        if os.path.exists(models_path):
-            print(f"\n📊 СТАТИСТИКА ПАПКИ MODELS:")
-            print("="*60)
-            
-            model_types = ["vae", "loras", "clip", "unet", "gguf", "checkpoints"]
-            total_files = 0
-            total_size = 0
-            
-            for model_type in model_types:
-                type_path = os.path.join(models_path, model_type)
-                if os.path.exists(type_path):
-                    try:
-                        files = [f for f in os.listdir(type_path) if os.path.isfile(os.path.join(type_path, f))]
-                        type_size = sum(os.path.getsize(os.path.join(type_path, f)) for f in files)
-                        total_files += len(files)
-                        total_size += type_size
-                        
-                        print(f"\n{model_type.upper()}:")
-                        print(f"  Файлов: {len(files)}")
-                        print(f"  Размер: {type_size / (1024*1024*1024):.2f} GB")
-                        if files:
-                            print(f"  Примеры:")
-                            for f in files[:5]:
-                                file_path = os.path.join(type_path, f)
-                                file_size = os.path.getsize(file_path)
-                                size_str = f"{file_size / (1024*1024*1024):.2f} GB" if file_size > 1024*1024*1024 else f"{file_size / (1024*1024):.2f} MB"
-                                print(f"    - {f} ({size_str})")
-                            if len(files) > 5:
-                                print(f"    ... и еще {len(files) - 5} файлов")
-                    except Exception as e:
-                        print(f"  ⚠️ Ошибка чтения {model_type}: {e}")
-            
-            print(f"\n📈 ИТОГО:")
-            print(f"  Всего файлов: {total_files}")
-            print(f"  Общий размер: {total_size / (1024*1024*1024):.2f} GB")
-        
-    except Exception as e:
-        print(f"❌ Ошибка при проверке содержимого: {e}")
-    
-    print("="*60 + "\n")
+# Удалены функции list_directory_recursive и check_network_volume_contents
+# Больше не нужны, так как путь к моделям известен
 
 def find_network_volume():
-    """Находит путь к Network Volume с моделями (стандартный путь RunPod)"""
+    """Находит путь к Network Volume с моделями (известный путь)"""
     print("\n" + "="*60)
     print("🔍 Поиск Network Volume с моделями")
     print("="*60)
     
-    # Стандартный путь RunPod для Network Volume
-    volume_path = RUNPOD_VOLUME_PATH
+    # Известный путь к моделям
+    models_path = os.path.join(RUNPOD_VOLUME_PATH, "ComfyUI", "models")
     
-    if not os.path.exists(volume_path):
-        print(f"⚠️ Network Volume не найден по стандартному пути: {volume_path}")
-        print("   Проверьте, что Network Volume подключен к Endpoint")
-        return None
+    if os.path.exists(models_path):
+        print(f"✅ Найдена папка models: {models_path}")
+        
+        # Быстрая проверка наличия типичных папок
+        try:
+            subdirs = [d for d in os.listdir(models_path) if os.path.isdir(os.path.join(models_path, d))]
+            model_subdirs = [d for d in subdirs if d in ["vae", "loras", "clip", "unet", "gguf", "checkpoints", "diffusion_models"]]
+            if model_subdirs:
+                print(f"   Подпапки с моделями: {', '.join(model_subdirs[:10])}")
+            return models_path
+        except Exception as e:
+            print(f"   ⚠️ Ошибка проверки: {e}")
+            return models_path  # Все равно возвращаем путь
     
-    print(f"✅ Network Volume найден: {volume_path}")
+    # Fallback: проверяем альтернативные пути
+    alternative_paths = [
+        os.path.join(RUNPOD_VOLUME_PATH, "models"),
+        RUNPOD_VOLUME_PATH,
+    ]
     
-    try:
-        items = os.listdir(volume_path)
-        print(f"   Содержимое: {', '.join(items)}")
-        
-        # Ищем папку models в разных местах
-        possible_models_paths = [
-            os.path.join(volume_path, "models"),  # /runpod-volume/models
-            os.path.join(volume_path, "ComfyUI", "models"),  # /runpod-volume/ComfyUI/models
-            volume_path,  # Может быть models напрямую в volume_path
-        ]
-        
-        models_path = None
-        for possible_path in possible_models_paths:
-            if os.path.exists(possible_path):
-                # Проверяем, есть ли там структура models (vae, loras, clip и т.д.)
-                try:
-                    subdirs = [d for d in os.listdir(possible_path) if os.path.isdir(os.path.join(possible_path, d))]
-                    # Проверяем наличие типичных папок для моделей
-                    if any(d in ["vae", "loras", "clip", "unet", "gguf", "checkpoints", "diffusion_models"] for d in subdirs):
-                        models_path = possible_path
-                        print(f"✅ Найдена папка models: {models_path}")
-                        print(f"   Подпапки: {', '.join(subdirs)}")
-                        break
-                except Exception as e:
-                    continue
-        
-        if models_path and os.path.exists(models_path):
-            # Проверяем наличие нужных моделей
+    for alt_path in alternative_paths:
+        if os.path.exists(alt_path):
             try:
-                vae_path = os.path.join(models_path, "vae")
-                loras_path = os.path.join(models_path, "loras")
-                
-                if os.path.exists(vae_path):
-                    vae_files = [f for f in os.listdir(vae_path) if f.endswith('.safetensors')]
-                    print(f"   VAE файлов: {len(vae_files)}")
-                    if "wan_2.1_vae.safetensors" in vae_files:
-                        print(f"   ✅ Найден wan_2.1_vae.safetensors")
-                
-                if os.path.exists(loras_path):
-                    lora_files = [f for f in os.listdir(loras_path) if f.endswith('.safetensors')]
-                    print(f"   LoRA файлов: {len(lora_files)}")
-                
-                # Выводим детальное содержимое
-                check_network_volume_contents(volume_path)
-                
-                return models_path
-            except Exception as e:
-                print(f"   ⚠️ Ошибка проверки структуры: {e}")
-                return models_path  # Все равно возвращаем путь
-        else:
-            print(f"⚠️ Папка models не найдена в {volume_path}")
-            print(f"   Проверенные пути: {possible_models_paths}")
-            print(f"   Попробуйте создать папку models в Network Volume со структурой:")
-            print(f"   models/")
-            print(f"   ├── vae/")
-            print(f"   ├── loras/")
-            print(f"   ├── clip/")
-            print(f"   └── unet/ или gguf/")
-            return None
-            
-    except Exception as e:
-        print(f"❌ Ошибка чтения Network Volume: {e}")
-        return None
+                subdirs = [d for d in os.listdir(alt_path) if os.path.isdir(os.path.join(alt_path, d))]
+                if any(d in ["vae", "loras", "clip", "unet", "gguf"] for d in subdirs):
+                    print(f"✅ Найдена папка models (альтернативный путь): {alt_path}")
+                    return alt_path
+            except:
+                continue
+    
+    print(f"⚠️ Папка models не найдена")
+    print(f"   Проверенные пути: {models_path}, {alternative_paths}")
+    return None
 
 def setup_models_symlink(network_models_path):
     """
