@@ -118,26 +118,33 @@ def find_network_volume():
     
     try:
         items = os.listdir(volume_path)
-        print(f"   Содержимое: {', '.join(items[:10])}")
+        print(f"   Содержимое: {', '.join(items)}")
         
-        # Ищем папку models
+        # Ищем папку models в разных местах
+        possible_models_paths = [
+            os.path.join(volume_path, "models"),  # /runpod-volume/models
+            os.path.join(volume_path, "ComfyUI", "models"),  # /runpod-volume/ComfyUI/models
+            volume_path,  # Может быть models напрямую в volume_path
+        ]
+        
         models_path = None
-        if "models" in items:
-            models_path = os.path.join(volume_path, "models")
-        else:
-            # Возможно, models находится напрямую в volume_path
-            if any(os.path.isdir(os.path.join(volume_path, d)) and d in ["vae", "loras", "clip"] for d in items):
-                models_path = volume_path
+        for possible_path in possible_models_paths:
+            if os.path.exists(possible_path):
+                # Проверяем, есть ли там структура models (vae, loras, clip и т.д.)
+                try:
+                    subdirs = [d for d in os.listdir(possible_path) if os.path.isdir(os.path.join(possible_path, d))]
+                    # Проверяем наличие типичных папок для моделей
+                    if any(d in ["vae", "loras", "clip", "unet", "gguf", "checkpoints", "diffusion_models"] for d in subdirs):
+                        models_path = possible_path
+                        print(f"✅ Найдена папка models: {models_path}")
+                        print(f"   Подпапки: {', '.join(subdirs)}")
+                        break
+                except Exception as e:
+                    continue
         
         if models_path and os.path.exists(models_path):
-            print(f"✅ Найдена папка models: {models_path}")
-            
-            # Проверяем структуру
+            # Проверяем наличие нужных моделей
             try:
-                subdirs = [d for d in os.listdir(models_path) if os.path.isdir(os.path.join(models_path, d))]
-                print(f"   Подпапки: {', '.join(subdirs)}")
-                
-                # Проверяем наличие нужных моделей
                 vae_path = os.path.join(models_path, "vae")
                 loras_path = os.path.join(models_path, "loras")
                 
@@ -160,6 +167,13 @@ def find_network_volume():
                 return models_path  # Все равно возвращаем путь
         else:
             print(f"⚠️ Папка models не найдена в {volume_path}")
+            print(f"   Проверенные пути: {possible_models_paths}")
+            print(f"   Попробуйте создать папку models в Network Volume со структурой:")
+            print(f"   models/")
+            print(f"   ├── vae/")
+            print(f"   ├── loras/")
+            print(f"   ├── clip/")
+            print(f"   └── unet/ или gguf/")
             return None
             
     except Exception as e:
@@ -258,7 +272,7 @@ def start_comfyui():
     print(f"✅ ComfyUI процесс запущен (PID: {process.pid})")
     return process
 
-def wait_for_comfyui(comfyui_process, max_wait=120):
+def wait_for_comfyui(comfyui_process, max_wait=180):
     """Ждет пока ComfyUI запустится и просканирует модели"""
     print("⏳ Ожидание запуска ComfyUI...")
     
@@ -275,13 +289,14 @@ def wait_for_comfyui(comfyui_process, max_wait=120):
             return False
         
         try:
-            response = requests.get(f"{COMFYUI_URL}/system_stats", timeout=2)
+            response = requests.get(f"{COMFYUI_URL}/system_stats", timeout=5)
             if response.status_code == 200:
                 print("✅ ComfyUI API доступен, жду сканирования моделей...")
                 
                 # КРИТИЧНО: Даем достаточно времени на сканирование моделей с Network Volume
-                print("⏳ Ожидание сканирования моделей (60 секунд)...")
-                time.sleep(60)  # Увеличиваем до 60 секунд для Network Volume
+                # ComfyUI может долго сканировать модели, особенно если их много
+                print("⏳ Ожидание сканирования моделей (90 секунд)...")
+                time.sleep(90)  # Увеличиваем до 90 секунд для Network Volume
                 
                 # Проверяем доступность моделей через object_info
                 try:
