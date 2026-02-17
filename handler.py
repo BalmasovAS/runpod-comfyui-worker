@@ -603,7 +603,7 @@ def cleanup_comfyui(process, timeout=10):
         except Exception:
             pass
 
-def handler(event):
+def handler(job):
     """
     Handler для RunPod Serverless
     Принимает запрос с workflow и параметрами
@@ -642,7 +642,7 @@ def handler(event):
             }
         
         # Получаем данные из запроса
-        input_data = event.get("input", {})
+        input_data = job.get("input", {})
         workflow_type = input_data.get("workflow", "photo")  # photo, video, voice
         workflow_params = input_data.get("params", {})
         
