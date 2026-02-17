@@ -35,6 +35,18 @@ RUN git clone https://github.com/1038lab/ComfyUI-QwenTTS.git && \
     cd .. && \
     git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git && \
     cd ComfyUI-VideoHelperSuite && \
+    pip install -r requirements.txt || echo "No requirements.txt" && \
+    cd .. && \
+    git clone https://github.com/tencent-ailab/hunyuan-comfyui.git ComfyUI-HunyuanVideo && \
+    cd ComfyUI-HunyuanVideo && \
+    pip install -r requirements.txt || echo "No requirements.txt" && \
+    cd .. && \
+    git clone https://github.com/crystian/ComfyUI-Crystools.git && \
+    cd ComfyUI-Crystools && \
+    pip install -r requirements.txt || echo "No requirements.txt" && \
+    cd .. && \
+    git clone https://github.com/rgthree/rgthree-comfy.git && \
+    cd rgthree-comfy && \
     pip install -r requirements.txt || echo "No requirements.txt"
 
 # Копируем ваш код
