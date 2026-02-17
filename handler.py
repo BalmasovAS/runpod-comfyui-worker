@@ -493,6 +493,24 @@ def handler(job):
             
             print(f"📤 Отправляю workflow в ComfyUI (узлов: {len(workflow_to_send)})")
         
+        # Проверяем, что все узлы присутствуют в workflow
+        if isinstance(workflow_to_send, dict):
+            if "nodes" in workflow_to_send:
+                # Формат с nodes - проверяем наличие всех узлов
+                node_ids_in_workflow = {str(node.get("id")) for node in workflow_to_send.get("nodes", [])}
+                print(f"📋 Workflow содержит {len(workflow_to_send.get('nodes', []))} узлов")
+            else:
+                # Плоский формат - проверяем наличие всех узлов
+                node_ids_in_workflow = set(workflow_to_send.keys())
+                print(f"📋 Workflow содержит {len(workflow_to_send)} узлов")
+                
+                # Проверяем наличие узла Seed Generator
+                seed_gen_nodes = [k for k, v in workflow_to_send.items() if isinstance(v, dict) and v.get("class_type") == "Seed Generator"]
+                if seed_gen_nodes:
+                    print(f"✅ Найден узел Seed Generator: {seed_gen_nodes}")
+                else:
+                    print("⚠️ Узел Seed Generator не найден в workflow")
+        
         # Отправляем промпт в очередь
         print("📤 Отправляю workflow в ComfyUI API...")
         result = queue_prompt(workflow_to_send)
