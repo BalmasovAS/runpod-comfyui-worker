@@ -849,5 +849,6 @@ def handler(job):
         }
 
 # Запускаем RunPod serverless
+# RunPod requires runpod.serverless.start() to be called
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})
