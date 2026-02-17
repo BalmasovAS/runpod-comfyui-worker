@@ -316,11 +316,9 @@ def apply_photo_params(workflow, params):
         # Ищем узел "RandomSeed" (стандартный узел ComfyUI)
         found_id, node_data = find_node_by_type(workflow, "RandomSeed")
         if found_id and "inputs" in workflow[found_id]:
-            # RandomSeed использует параметры seed и noise_seed
+            # RandomSeed использует параметр seed
             if "seed" in workflow[found_id]["inputs"]:
                 workflow[found_id]["inputs"]["seed"] = seed_value
-            if "noise_seed" in workflow[found_id]["inputs"]:
-                workflow[found_id]["inputs"]["noise_seed"] = seed_value
             print(f"✅ Seed обновлен в узле 'RandomSeed' (ID: {found_id}): {seed_value}")
         else:
             # Ищем узел с seed в inputs (для обратной совместимости)
@@ -384,11 +382,8 @@ def apply_photo_params_to_nodes(nodes, params):
         seed_updated = False
         for node in nodes:
             if node.get("type") == "RandomSeed":
-                if "inputs" in node:
-                    if "seed" in node["inputs"]:
-                        node["inputs"]["seed"] = seed_value
-                    if "noise_seed" in node["inputs"]:
-                        node["inputs"]["noise_seed"] = seed_value
+                if "inputs" in node and "seed" in node["inputs"]:
+                    node["inputs"]["seed"] = seed_value
                     print(f"✅ Seed обновлен в узле 'RandomSeed' (ID: {node.get('id')}): {seed_value}")
                     seed_updated = True
                     break
