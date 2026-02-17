@@ -136,10 +136,9 @@ for i in {1..500}; do
     sleep 0.05  # 50ms как в comfuiStory (COMFY_API_AVAILABLE_INTERVAL_MS)
 done
 
-# Даем время на сканирование моделей и загрузку custom nodes
-echo "⏳ Ожидание сканирования моделей и загрузки custom nodes (90 секунд)..."
-echo "   Это нужно для загрузки всех custom nodes (KJNodes, Wan Video V2 и т.д.)"
-sleep 90
+# Custom nodes установлены в Dockerfile, должны быть доступны сразу
+# Проверяем, что ComfyUI полностью готов (API отвечает)
+echo "✅ ComfyUI готов, custom nodes должны быть загружены"
 
 # Запускаем handler (он заменит текущий процесс через exec)
 echo "🚀 Запускаю RunPod handler..."

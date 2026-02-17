@@ -499,6 +499,13 @@ def handler(job):
                 # Формат с nodes - проверяем наличие всех узлов
                 node_ids_in_workflow = {str(node.get("id")) for node in workflow_to_send.get("nodes", [])}
                 print(f"📋 Workflow содержит {len(workflow_to_send.get('nodes', []))} узлов")
+                
+                # Проверяем наличие узла Seed Generator
+                seed_gen_nodes = [node for node in workflow_to_send.get("nodes", []) if node.get("type") == "Seed Generator"]
+                if seed_gen_nodes:
+                    print(f"✅ Найден узел Seed Generator в формате nodes: {[n.get('id') for n in seed_gen_nodes]}")
+                else:
+                    print("⚠️ Узел Seed Generator не найден в workflow (формат nodes)")
             else:
                 # Плоский формат - проверяем наличие всех узлов
                 node_ids_in_workflow = set(workflow_to_send.keys())
@@ -508,8 +515,19 @@ def handler(job):
                 seed_gen_nodes = [k for k, v in workflow_to_send.items() if isinstance(v, dict) and v.get("class_type") == "Seed Generator"]
                 if seed_gen_nodes:
                     print(f"✅ Найден узел Seed Generator: {seed_gen_nodes}")
+                    # Проверяем содержимое узла
+                    for node_id in seed_gen_nodes:
+                        node_data = workflow_to_send[node_id]
+                        print(f"   Узел {node_id}: class_type={node_data.get('class_type')}, inputs={node_data.get('inputs', {})}")
                 else:
-                    print("⚠️ Узел Seed Generator не найден в workflow")
+                    print("⚠️ Узел Seed Generator не найден в workflow (плоский формат)")
+                    # Выводим все class_type для отладки
+                    all_class_types = {k: v.get("class_type") for k, v in workflow_to_send.items() if isinstance(v, dict)}
+                    print(f"   Все class_type в workflow: {all_class_types}")
+        
+        # Логируем первые 1000 символов workflow для отладки
+        workflow_str = json.dumps(workflow_to_send)
+        print(f"📋 Workflow для отправки (первые 1000 символов): {workflow_str[:1000]}")
         
         # Отправляем промпт в очередь
         print("📤 Отправляю workflow в ComfyUI API...")
