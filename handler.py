@@ -293,17 +293,24 @@ def apply_photo_params(workflow, params):
     # Обновляем seed
     if "seed" in params:
         seed_value = int(params["seed"])
-        found_id, node_data = find_node_by_input(workflow, "seed")
-        if found_id:
+        # Сначала ищем узел "Seed Generator" (из KJNodes)
+        found_id, node_data = find_node_by_type(workflow, "Seed Generator")
+        if found_id and "inputs" in workflow[found_id] and "seed" in workflow[found_id]["inputs"]:
             workflow[found_id]["inputs"]["seed"] = seed_value
-            print(f"✅ Seed обновлен в узле '{found_id}': {seed_value}")
+            print(f"✅ Seed обновлен в узле 'Seed Generator' (ID: {found_id}): {seed_value}")
         else:
-            # Пробуем найти EmptyHunyuanLatentVideo
-            found_id, _ = find_node_by_type(workflow, "EmptyHunyuanLatentVideo")
-            if found_id and "inputs" in workflow[found_id]:
-                if "seed" in workflow[found_id]["inputs"]:
-                    workflow[found_id]["inputs"]["seed"] = seed_value
-                    print(f"✅ Seed обновлен в узле '{found_id}': {seed_value}")
+            # Ищем узел с seed в inputs
+            found_id, node_data = find_node_by_input(workflow, "seed")
+            if found_id:
+                workflow[found_id]["inputs"]["seed"] = seed_value
+                print(f"✅ Seed обновлен в узле '{found_id}': {seed_value}")
+            else:
+                # Пробуем найти EmptyHunyuanLatentVideo
+                found_id, _ = find_node_by_type(workflow, "EmptyHunyuanLatentVideo")
+                if found_id and "inputs" in workflow[found_id]:
+                    if "seed" in workflow[found_id]["inputs"]:
+                        workflow[found_id]["inputs"]["seed"] = seed_value
+                        print(f"✅ Seed обновлен в узле '{found_id}': {seed_value}")
 
 def find_node_in_nodes(nodes, node_id=None, node_type=None, title_keyword=None):
     """Находит узел в массиве nodes по ID, типу или title"""
@@ -349,12 +356,23 @@ def apply_photo_params_to_nodes(nodes, params):
     # Обновляем seed (если нужно)
     if "seed" in params:
         seed_value = int(params["seed"])
-        # Ищем узел с seed в inputs или widgets_values
+        # Ищем узел "Seed Generator" (из KJNodes)
+        seed_updated = False
         for node in nodes:
-            if "inputs" in node and "seed" in node["inputs"]:
-                node["inputs"]["seed"] = seed_value
-                print(f"✅ Seed обновлен в узле '{node.get('id')}': {seed_value}")
-                break
+            if node.get("type") == "Seed Generator":
+                if "inputs" in node and "seed" in node["inputs"]:
+                    node["inputs"]["seed"] = seed_value
+                    print(f"✅ Seed обновлен в узле 'Seed Generator' (ID: {node.get('id')}): {seed_value}")
+                    seed_updated = True
+                    break
+        
+        # Если не нашли Seed Generator, ищем узел с seed в inputs
+        if not seed_updated:
+            for node in nodes:
+                if "inputs" in node and "seed" in node["inputs"]:
+                    node["inputs"]["seed"] = seed_value
+                    print(f"✅ Seed обновлен в узле '{node.get('id')}': {seed_value}")
+                    break
 
 def apply_video_params_to_nodes(nodes, params):
     """Применяет параметры для видео к формату с nodes"""
