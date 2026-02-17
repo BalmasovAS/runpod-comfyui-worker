@@ -41,6 +41,14 @@ RUN git clone https://github.com/1038lab/ComfyUI-QwenTTS.git && \
 WORKDIR /workspace
 COPY handler.py /workspace/handler.py
 COPY workflows/ /workspace/ComfyUI/workflows/
+COPY start.sh /workspace/start.sh
 
-# Запускаем RunPod serverless handler
-CMD ["python", "/workspace/handler.py"]
+# Делаем start.sh исполняемым
+RUN chmod +x /workspace/start.sh
+
+# Устанавливаем curl для проверки ComfyUI
+RUN apt-get update -y && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+# Запускаем через start.sh (как в comfuiStory)
+# start.sh запустит ComfyUI в фоне, затем handler
+CMD ["/workspace/start.sh"]

@@ -3,9 +3,7 @@ import requests
 import json
 import time
 import os
-import subprocess
 import base64
-import threading
 
 # Путь к ComfyUI
 COMFYUI_DIR = "/workspace/ComfyUI"
@@ -260,170 +258,8 @@ def setup_models_symlink(network_models_path):
     
     return False
 
-def start_comfyui():
-    """Запускает ComfyUI в фоновом режиме с логированием"""
-    print(f"🚀 Запускаю ComfyUI из {COMFYUI_DIR}...")
-    
-    # Проверяем, что директория существует
-    if not os.path.exists(COMFYUI_DIR):
-        print(f"❌ Директория ComfyUI не найдена: {COMFYUI_DIR}")
-        return None
-    
-    if not os.path.exists(os.path.join(COMFYUI_DIR, "main.py")):
-        print(f"❌ Файл main.py не найден в {COMFYUI_DIR}")
-        return None
-    
-    os.chdir(COMFYUI_DIR)
-    
-    # Запускаем с логированием в реальном времени
-    # Добавляем --enable-cors-header для работы с API
-    process = subprocess.Popen(
-        ["python", "main.py", "--listen", "127.0.0.1", "--port", str(COMFYUI_PORT), "--enable-cors-header", "*"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,  # Объединяем stderr в stdout
-        universal_newlines=True,
-        bufsize=1,  # Line buffered
-        env=dict(os.environ, PYTHONUNBUFFERED="1")  # Отключаем буферизацию для реального времени
-    )
-    
-    # Запускаем поток для чтения логов
-    server_started = threading.Event()
-    
-    def log_output():
-        try:
-            for line in iter(process.stdout.readline, ''):
-                if line:
-                    line_clean = line.rstrip()
-                    print(f"[ComfyUI] {line_clean}")
-                    
-                    # Проверяем, запустился ли сервер
-                    # ComfyUI выводит различные сообщения о запуске сервера
-                    server_indicators = [
-                        "Starting server",
-                        "To see the GUI go to",
-                        f"http://127.0.0.1:{COMFYUI_PORT}",
-                        "Starting ComfyUI",
-                        "Server started",
-                        "Listening on",
-                        "Running on",
-                        "Starting HTTP server"
-                    ]
-                    if any(indicator in line_clean for indicator in server_indicators):
-                        print(f"✅ ComfyUI сервер запустился! (найдено: {line_clean[:100]})")
-                        server_started.set()
-        except Exception as e:
-            print(f"❌ Ошибка чтения логов ComfyUI: {e}")
-    
-    log_thread = threading.Thread(target=log_output, daemon=True)
-    log_thread.start()
-    
-    # Даем процессу немного времени на запуск
-    time.sleep(2)
-    
-    # Ждем сигнала о запуске сервера (максимум 30 секунд)
-    if not server_started.wait(timeout=30):
-        print("⚠️ Не получен сигнал о запуске сервера из логов, продолжаем проверку через API...")
-    
-    # Проверяем, что процесс еще работает
-    if process.poll() is not None:
-        # Процесс уже завершился - значит была ошибка
-        print(f"❌ ComfyUI процесс завершился с кодом: {process.returncode}")
-        return None
-    
-    print(f"✅ ComfyUI процесс запущен (PID: {process.pid})")
-    return process
-
-def wait_for_comfyui(comfyui_process, max_wait=300):
-    """Ждет пока ComfyUI запустится и просканирует модели"""
-    print("⏳ Ожидание запуска ComfyUI...")
-    print(f"   Проверяю доступность {COMFYUI_URL}/system_stats")
-    
-    api_available = False
-    for i in range(max_wait):
-        # Проверяем, что процесс еще работает
-        if comfyui_process is None:
-            print("❌ ComfyUI процесс не был запущен")
-            return False
-        
-        if comfyui_process.poll() is not None:
-            # Процесс завершился - значит была ошибка
-            returncode = comfyui_process.returncode
-            print(f"❌ ComfyUI процесс завершился с кодом: {returncode}")
-            return False
-        
-        # Пробуем разные endpoints для проверки готовности
-        try:
-            # Сначала пробуем простой endpoint
-            response = requests.get(f"{COMFYUI_URL}/system_stats", timeout=3)
-            if response.status_code == 200:
-                if not api_available:
-                    print("✅ ComfyUI API доступен!")
-                    api_available = True
-                
-                # Проверяем, что сервер действительно работает
-                try:
-                    # Пробуем получить object_info для проверки полной готовности
-                    objects_response = requests.get(f"{COMFYUI_URL}/object_info", timeout=5)
-                    if objects_response.status_code == 200:
-                        print("✅ ComfyUI полностью готов, жду сканирования моделей...")
-                        
-                        # КРИТИЧНО: Даем достаточно времени на сканирование моделей с Network Volume
-                        # ComfyUI может долго сканировать модели, особенно если их много
-                        print("⏳ Ожидание сканирования моделей (60 секунд)...")
-                        time.sleep(60)  # Даем время на сканирование
-                
-                        # Проверяем доступность моделей через object_info
-                        object_info = objects_response.json()
-                        
-                        # Проверяем наличие VAE моделей
-                        vae_loader = object_info.get("VAELoader", {})
-                        vae_input = vae_loader.get("input", {})
-                        vae_names = vae_input.get("vae_name", [])
-                        
-                        if isinstance(vae_names, list) and len(vae_names) > 0:
-                            print(f"✅ Найдено VAE моделей: {len(vae_names)}")
-                            if "wan_2.1_vae.safetensors" in vae_names:
-                                print("✅ wan_2.1_vae.safetensors найден!")
-                            else:
-                                print(f"⚠️ wan_2.1_vae.safetensors не найден. Доступные: {vae_names[:5]}")
-                        else:
-                            print(f"⚠️ VAE модели не найдены или список пуст")
-                        
-                        # Проверяем наличие LoRA моделей
-                        lora_loader = object_info.get("LoraLoader", {})
-                        lora_input = lora_loader.get("input", {})
-                        lora_names = lora_input.get("lora_name", [])
-                        
-                        if isinstance(lora_names, list) and len(lora_names) > 0:
-                            print(f"✅ Найдено LoRA моделей: {len(lora_names)}")
-                        else:
-                            print(f"⚠️ LoRA модели не найдены")
-                        
-                        print("✅ ComfyUI готов к работе")
-                        return True
-                except Exception as e:
-                    print(f"⚠️ object_info недоступен: {e}, но API работает - продолжаем")
-                    return True
-        except requests.exceptions.ConnectionError:
-            # Сервер еще не запустился
-            if i % 10 == 0:
-                print(f"⏳ Ожидание ComfyUI... ({i}/{max_wait}с) [Процесс работает: PID {comfyui_process.pid}]")
-        except requests.exceptions.Timeout:
-            # Таймаут - возможно сервер перегружен
-            if i % 10 == 0:
-                print(f"⏳ Таймаут при подключении к ComfyUI... ({i}/{max_wait}с)")
-        except Exception as e:
-            if i % 10 == 0:
-                print(f"⏳ Ожидание ComfyUI... ({i}/{max_wait}с) [Ошибка: {type(e).__name__}]")
-        
-        time.sleep(1)
-    
-    if api_available:
-        print("⚠️ ComfyUI API был доступен, но не удалось получить полную информацию")
-        return True  # Все равно продолжаем, если API работал
-    
-    print("❌ ComfyUI не запустился за отведенное время")
-    return False
+# Функции start_comfyui, wait_for_comfyui, cleanup_comfyui удалены
+# ComfyUI теперь запускается через start.sh скрипт (как в comfuiStory)
 
 def queue_prompt(prompt):
     """Отправляет промпт в очередь ComfyUI"""
@@ -673,72 +509,33 @@ def apply_voice_params_to_nodes(nodes, params):
                 print(f"✅ Параметр '{param_key}' обновлен в узле '{node.get('id')}': {param_value}")
                 break
 
-def cleanup_comfyui(process, timeout=10):
-    """
-    Завершает процесс ComfyUI с гарантией
-    Сначала пробует terminate(), затем kill() если нужно
-    """
-    if process is None:
-        return
-    
+# Функция cleanup_comfyui удалена
+# ComfyUI остается запущенным для следующих запросов (как в comfuiStory)
+
+def check_comfyui_server():
+    """Проверяет доступность ComfyUI сервера (как в comfuiStory)"""
     try:
-        # Пробуем мягкое завершение
-        process.terminate()
-        try:
-            process.wait(timeout=timeout)
-            print(f"✅ ComfyUI процесс завершен (terminate)")
-        except subprocess.TimeoutExpired:
-            # Если не завершился, принудительно убиваем
-            print(f"⚠️ ComfyUI не завершился за {timeout}с, принудительное завершение...")
-            process.kill()
-            process.wait(timeout=5)
-            print(f"✅ ComfyUI процесс завершен (kill)")
-    except Exception as e:
-        print(f"⚠️ Ошибка при завершении ComfyUI: {e}")
-        try:
-            # Последняя попытка - kill
-            process.kill()
-            process.wait(timeout=2)
-        except Exception:
-            pass
+        response = requests.get(f"{COMFYUI_URL}/system_stats", timeout=5)
+        return response.status_code == 200
+    except Exception:
+        return False
 
 def handler(job):
     """
     Handler для RunPod Serverless
     Принимает запрос с workflow и параметрами
     
-    ВАЖНО: Воркер автоматически завершает работу после возврата результата.
-    RunPod serverless завершает контейнер после того, как handler вернет ответ.
-    
-    Процесс ComfyUI завершается во всех случаях:
-    - При успешном завершении генерации
-    - При ошибке генерации
-    - При таймауте
-    - При любой другой ошибке
+    ComfyUI должен быть уже запущен через start.sh скрипт
+    (как в comfuiStory подходе)
     """
-    comfyui_process = None
     try:
-        # Шаг 1: Находим Network Volume с моделями
-        network_models_path = find_network_volume()
-        
-        # Шаг 2: Настраиваем символические ссылки
-        if network_models_path:
-            setup_models_symlink(network_models_path)
-        
-        # Шаг 3: Запускаем ComfyUI
-        comfyui_process = start_comfyui()
-        
-        if comfyui_process is None:
+        # Проверяем, что ComfyUI доступен (как в comfuiStory)
+        if not check_comfyui_server():
             return {
-                "error": "Не удалось запустить ComfyUI процесс"
+                "error": "ComfyUI сервер недоступен. Убедитесь, что ComfyUI запущен."
             }
         
-        # Шаг 4: Ждем пока ComfyUI запустится и просканирует модели
-        if not wait_for_comfyui(comfyui_process):
-            cleanup_comfyui(comfyui_process)
-            return {
-                "error": "ComfyUI не запустился за отведенное время"
-            }
+        print("✅ ComfyUI сервер доступен")
         
         # Получаем данные из запроса
         input_data = job.get("input", {})
@@ -820,7 +617,6 @@ def handler(job):
                                 error_details += f" ({err_details})"
                 
                 print(f"❌ Ошибка при отправке промпта: {error_details}")
-                cleanup_comfyui(comfyui_process)
                 return {
                     "error": "Не удалось отправить промпт в очередь",
                     "details": error_details,
@@ -828,7 +624,6 @@ def handler(job):
                     "node_errors": node_errors
                 }
             
-            cleanup_comfyui(comfyui_process)
             return {
                 "error": "Не удалось отправить промпт в очередь",
                 "details": result
@@ -899,10 +694,10 @@ def handler(job):
                                 "type": "audio"
                             })
                     
-                    # Завершаем процесс ComfyUI перед возвратом результата
-                    cleanup_comfyui(comfyui_process)
+                    # ComfyUI остается запущенным для следующих запросов
+                    # (как в comfuiStory подходе)
                     
-                    print("✅ Генерация завершена успешно, воркер завершает работу")
+                    print("✅ Генерация завершена успешно")
                     
                     return {
                         "status": "completed",
@@ -916,7 +711,6 @@ def handler(job):
                     # Генерация провалилась
                     error_msg = status.get("error", "Неизвестная ошибка")
                     print(f"❌ Генерация провалилась: {error_msg}")
-                    cleanup_comfyui(comfyui_process)
                     
                     return {
                         "status": "failed",
@@ -927,7 +721,6 @@ def handler(job):
         
         # Таймаут
         print("⏱️ Превышено время ожидания генерации")
-        cleanup_comfyui(comfyui_process)
         
         return {
             "status": "timeout",
@@ -935,11 +728,10 @@ def handler(job):
         }
         
     except Exception as e:
-        # Убеждаемся что процесс завершен при любой ошибке
+        # Обрабатываем ошибки без завершения ComfyUI
         error_type = type(e).__name__
         error_msg = str(e)
         print(f"❌ Критическая ошибка в handler: {error_type}: {error_msg}")
-        cleanup_comfyui(comfyui_process)
         
         return {
             "error": error_msg,
