@@ -272,10 +272,12 @@ def start_comfyui():
     print(f"✅ ComfyUI процесс запущен (PID: {process.pid})")
     return process
 
-def wait_for_comfyui(comfyui_process, max_wait=180):
+def wait_for_comfyui(comfyui_process, max_wait=300):
     """Ждет пока ComfyUI запустится и просканирует модели"""
     print("⏳ Ожидание запуска ComfyUI...")
+    print(f"   Проверяю доступность {COMFYUI_URL}/system_stats")
     
+    api_available = False
     for i in range(max_wait):
         # Проверяем, что процесс еще работает
         if comfyui_process is None:
@@ -288,20 +290,28 @@ def wait_for_comfyui(comfyui_process, max_wait=180):
             print(f"❌ ComfyUI процесс завершился с кодом: {returncode}")
             return False
         
+        # Пробуем разные endpoints для проверки готовности
         try:
-            response = requests.get(f"{COMFYUI_URL}/system_stats", timeout=5)
+            # Сначала пробуем простой endpoint
+            response = requests.get(f"{COMFYUI_URL}/system_stats", timeout=3)
             if response.status_code == 200:
-                print("✅ ComfyUI API доступен, жду сканирования моделей...")
+                if not api_available:
+                    print("✅ ComfyUI API доступен!")
+                    api_available = True
                 
-                # КРИТИЧНО: Даем достаточно времени на сканирование моделей с Network Volume
-                # ComfyUI может долго сканировать модели, особенно если их много
-                print("⏳ Ожидание сканирования моделей (90 секунд)...")
-                time.sleep(90)  # Увеличиваем до 90 секунд для Network Volume
-                
-                # Проверяем доступность моделей через object_info
+                # Проверяем, что сервер действительно работает
                 try:
-                    objects_response = requests.get(f"{COMFYUI_URL}/object_info", timeout=10)
+                    # Пробуем получить object_info для проверки полной готовности
+                    objects_response = requests.get(f"{COMFYUI_URL}/object_info", timeout=5)
                     if objects_response.status_code == 200:
+                        print("✅ ComfyUI полностью готов, жду сканирования моделей...")
+                        
+                        # КРИТИЧНО: Даем достаточно времени на сканирование моделей с Network Volume
+                        # ComfyUI может долго сканировать модели, особенно если их много
+                        print("⏳ Ожидание сканирования моделей (60 секунд)...")
+                        time.sleep(60)  # Даем время на сканирование
+                
+                        # Проверяем доступность моделей через object_info
                         object_info = objects_response.json()
                         
                         # Проверяем наличие VAE моделей
@@ -331,12 +341,25 @@ def wait_for_comfyui(comfyui_process, max_wait=180):
                         print("✅ ComfyUI готов к работе")
                         return True
                 except Exception as e:
-                    print(f"⚠️ object_info недоступен: {e}, но продолжаем работу")
+                    print(f"⚠️ object_info недоступен: {e}, но API работает - продолжаем")
                     return True
-        except Exception as e:
+        except requests.exceptions.ConnectionError:
+            # Сервер еще не запустился
             if i % 10 == 0:
                 print(f"⏳ Ожидание ComfyUI... ({i}/{max_wait}с) [Процесс работает: PID {comfyui_process.pid}]")
+        except requests.exceptions.Timeout:
+            # Таймаут - возможно сервер перегружен
+            if i % 10 == 0:
+                print(f"⏳ Таймаут при подключении к ComfyUI... ({i}/{max_wait}с)")
+        except Exception as e:
+            if i % 10 == 0:
+                print(f"⏳ Ожидание ComfyUI... ({i}/{max_wait}с) [Ошибка: {type(e).__name__}]")
+        
         time.sleep(1)
+    
+    if api_available:
+        print("⚠️ ComfyUI API был доступен, но не удалось получить полную информацию")
+        return True  # Все равно продолжаем, если API работал
     
     print("❌ ComfyUI не запустился за отведенное время")
     return False
