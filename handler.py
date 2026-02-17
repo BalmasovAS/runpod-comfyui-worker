@@ -152,6 +152,26 @@ def queue_prompt(prompt):
     """Отправляет промпт в очередь ComfyUI"""
     p = {"prompt": prompt}
     data = json.dumps(p).encode('utf-8')
+    
+    # Логируем, что отправляем (первые 2000 символов)
+    prompt_str = json.dumps(prompt, indent=2)
+    print(f"📤 Отправляю в ComfyUI /prompt (первые 2000 символов):")
+    print(prompt_str[:2000])
+    
+    # Проверяем наличие узла RandomSeed в отправляемом workflow
+    if isinstance(prompt, dict):
+        seed_node_found = False
+        for node_id, node_data in prompt.items():
+            if isinstance(node_data, dict) and node_data.get("class_type") == "RandomSeed":
+                seed_node_found = True
+                print(f"✅ Узел RandomSeed найден в отправляемом workflow: {node_id}")
+                break
+        if not seed_node_found:
+            print("⚠️ Узел RandomSeed НЕ найден в отправляемом workflow!")
+            # Выводим все class_type для отладки
+            all_types = {k: v.get("class_type") for k, v in prompt.items() if isinstance(v, dict)}
+            print(f"   Все class_type в workflow: {list(all_types.values())[:20]}")
+    
     response = requests.post(f"{COMFYUI_URL}/prompt", data=data)
     return response.json()
 
@@ -293,13 +313,17 @@ def apply_photo_params(workflow, params):
     # Обновляем seed
     if "seed" in params:
         seed_value = int(params["seed"])
-        # Сначала ищем узел "Seed Generator" (из KJNodes)
-        found_id, node_data = find_node_by_type(workflow, "Seed Generator")
-        if found_id and "inputs" in workflow[found_id] and "seed" in workflow[found_id]["inputs"]:
-            workflow[found_id]["inputs"]["seed"] = seed_value
-            print(f"✅ Seed обновлен в узле 'Seed Generator' (ID: {found_id}): {seed_value}")
+        # Ищем узел "RandomSeed" (стандартный узел ComfyUI)
+        found_id, node_data = find_node_by_type(workflow, "RandomSeed")
+        if found_id and "inputs" in workflow[found_id]:
+            # RandomSeed использует параметры seed и noise_seed
+            if "seed" in workflow[found_id]["inputs"]:
+                workflow[found_id]["inputs"]["seed"] = seed_value
+            if "noise_seed" in workflow[found_id]["inputs"]:
+                workflow[found_id]["inputs"]["noise_seed"] = seed_value
+            print(f"✅ Seed обновлен в узле 'RandomSeed' (ID: {found_id}): {seed_value}")
         else:
-            # Ищем узел с seed в inputs
+            # Ищем узел с seed в inputs (для обратной совместимости)
             found_id, node_data = find_node_by_input(workflow, "seed")
             if found_id:
                 workflow[found_id]["inputs"]["seed"] = seed_value
@@ -356,17 +380,20 @@ def apply_photo_params_to_nodes(nodes, params):
     # Обновляем seed (если нужно)
     if "seed" in params:
         seed_value = int(params["seed"])
-        # Ищем узел "Seed Generator" (из KJNodes)
+        # Ищем узел "RandomSeed" (стандартный узел ComfyUI)
         seed_updated = False
         for node in nodes:
-            if node.get("type") == "Seed Generator":
-                if "inputs" in node and "seed" in node["inputs"]:
-                    node["inputs"]["seed"] = seed_value
-                    print(f"✅ Seed обновлен в узле 'Seed Generator' (ID: {node.get('id')}): {seed_value}")
+            if node.get("type") == "RandomSeed":
+                if "inputs" in node:
+                    if "seed" in node["inputs"]:
+                        node["inputs"]["seed"] = seed_value
+                    if "noise_seed" in node["inputs"]:
+                        node["inputs"]["noise_seed"] = seed_value
+                    print(f"✅ Seed обновлен в узле 'RandomSeed' (ID: {node.get('id')}): {seed_value}")
                     seed_updated = True
                     break
         
-        # Если не нашли Seed Generator, ищем узел с seed в inputs
+        # Если не нашли RandomSeed, ищем узел с seed в inputs
         if not seed_updated:
             for node in nodes:
                 if "inputs" in node and "seed" in node["inputs"]:
@@ -425,6 +452,81 @@ def check_comfyui_server():
     except Exception:
         return False
 
+def check_custom_nodes():
+    """Проверяет, какие custom nodes загружены в ComfyUI через object_info"""
+    try:
+        response = requests.get(f"{COMFYUI_URL}/object_info", timeout=10)
+        if response.status_code == 200:
+            object_info = response.json()
+            
+            # Логируем структуру object_info для отладки
+            print(f"📊 Структура object_info: {type(object_info)}")
+            if isinstance(object_info, dict):
+                print(f"   Ключи верхнего уровня (первые 20): {list(object_info.keys())[:20]}")
+            
+            # Ищем Seed Generator в object_info
+            # object_info может быть словарем, где ключи - это class_type узлов
+            all_node_types = []
+            if isinstance(object_info, dict):
+                # Проверяем, является ли это плоским словарем с class_type как ключами
+                # или вложенной структурой
+                for key, value in object_info.items():
+                    if isinstance(value, dict):
+                        # Если значение - словарь, это может быть информация об узле
+                        all_node_types.append(key)
+                    elif isinstance(value, list):
+                        # Если значение - список, это может быть список узлов
+                        all_node_types.append(key)
+            
+            # Проверяем наличие Seed Generator
+            if "Seed Generator" in all_node_types:
+                print(f"✅ Custom node 'Seed Generator' найден в object_info")
+                return True
+            else:
+                print(f"⚠️ Custom node 'Seed Generator' НЕ найден в object_info")
+                print(f"   Всего типов узлов: {len(all_node_types)}")
+                print(f"   Доступные типы узлов (первые 50): {all_node_types[:50]}")
+                # Ищем похожие названия
+                similar = [t for t in all_node_types if "seed" in t.lower() or "generator" in t.lower()]
+                if similar:
+                    print(f"   Похожие узлы: {similar}")
+                # Выводим полный список для отладки (первые 100)
+                print(f"   Полный список узлов (первые 100): {all_node_types[:100]}")
+                return False
+        else:
+            print(f"⚠️ object_info вернул статус {response.status_code}")
+            return False
+    except Exception as e:
+        print(f"⚠️ Ошибка проверки custom nodes: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+def check_custom_nodes():
+    """Проверяет, какие custom nodes загружены в ComfyUI"""
+    try:
+        response = requests.get(f"{COMFYUI_URL}/object_info", timeout=10)
+        if response.status_code == 200:
+            object_info = response.json()
+            # Ищем Seed Generator в object_info
+            all_node_types = []
+            for category, nodes in object_info.items():
+                if isinstance(nodes, dict) and "input" in nodes:
+                    all_node_types.append(category)
+            
+            # Проверяем наличие Seed Generator
+            if "Seed Generator" in all_node_types:
+                print(f"✅ Custom node 'Seed Generator' найден в object_info")
+                return True
+            else:
+                print(f"⚠️ Custom node 'Seed Generator' НЕ найден в object_info")
+                print(f"   Доступные типы узлов (первые 30): {all_node_types[:30]}")
+                return False
+        return False
+    except Exception as e:
+        print(f"⚠️ Ошибка проверки custom nodes: {e}")
+        return False
+
 def handler(job):
     """
     Handler для RunPod Serverless
@@ -442,13 +544,21 @@ def handler(job):
         
         print("✅ ComfyUI сервер доступен")
         
+        # Проверяем, что custom nodes загружены
+        print("🔍 Проверяю наличие custom nodes через object_info...")
+        check_custom_nodes()
+        
         # Получаем данные из запроса
+        print(f"📥 Получен job: {json.dumps(job, indent=2)[:500]}")
         input_data = job.get("input", {})
+        print(f"📥 input_data: {json.dumps(input_data, indent=2)[:500]}")
+        
         workflow_type = input_data.get("workflow", "photo")  # photo, video, voice
         workflow_params = input_data.get("params", {})
         
         print(f"📋 Тип workflow: {workflow_type}")
         print(f"📋 Получены параметры: {list(workflow_params.keys())}")
+        print(f"📋 Значения параметров: {workflow_params}")
         
         # Загружаем workflow
         workflow_path = f"{COMFYUI_DIR}/workflows/{workflow_type}.json"
