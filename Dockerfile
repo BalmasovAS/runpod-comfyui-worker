@@ -17,8 +17,8 @@ RUN git clone https://github.com/comfyanonymous/ComfyUI.git ComfyUI && \
 RUN pip uninstall -y torchvision && \
     pip install torchvision>=0.20.0 --index-url https://download.pytorch.org/whl/cu128
 
-# Устанавливаем RunPod SDK
-RUN pip install runpod requests
+# Устанавливаем RunPod SDK и PyYAML для extra_model_paths.yaml
+RUN pip install runpod requests pyyaml
 
 # Устанавливаем custom nodes
 WORKDIR /workspace/ComfyUI/custom_nodes

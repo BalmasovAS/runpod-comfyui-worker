@@ -181,48 +181,84 @@ def find_network_volume():
         return None
 
 def setup_models_symlink(network_models_path):
-    """Создает символические ссылки от Network Volume к ComfyUI models"""
+    """
+    Создает символические ссылки от Network Volume к ComfyUI models
+    Также создает extra_model_paths.yaml для ComfyUI, если нужно
+    """
     if not network_models_path:
         return False
     
     comfyui_models = os.path.join(COMFYUI_DIR, "models")
     
-    # Если папка models уже существует и не является ссылкой, не трогаем
-    if os.path.exists(comfyui_models) and not os.path.islink(comfyui_models):
-        print(f"⚠️ Папка {comfyui_models} уже существует, не создаю ссылку")
-        # Но проверим, может нужно создать ссылки на подпапки
-        try:
-            for subdir in ["vae", "loras", "clip", "unet", "gguf"]:
-                network_subdir = os.path.join(network_models_path, subdir)
-                comfyui_subdir = os.path.join(comfyui_models, subdir)
-                
-                if os.path.exists(network_subdir) and not os.path.exists(comfyui_subdir):
-                    os.makedirs(os.path.dirname(comfyui_subdir), exist_ok=True)
-                    os.symlink(network_subdir, comfyui_subdir)
-                    print(f"✅ Создана ссылка: {comfyui_subdir} -> {network_subdir}")
-        except Exception as e:
-            print(f"⚠️ Ошибка создания ссылок на подпапки: {e}")
-        return True
-    
-    # Создаем символическую ссылку на всю папку models
+    # Вариант 1: Создаем символические ссылки на подпапки (более безопасно)
+    # Это позволяет сохранить локальную папку models и добавить Network Volume как дополнительный путь
     try:
-        if os.path.exists(comfyui_models):
-            # Удаляем существующую папку если она пуста
-            try:
-                if not os.listdir(comfyui_models):
-                    os.rmdir(comfyui_models)
-                else:
-                    print(f"⚠️ Папка {comfyui_models} не пуста, не создаю ссылку")
-                    return False
-            except:
-                pass
+        # Создаем папку models если её нет
+        os.makedirs(comfyui_models, exist_ok=True)
         
-        os.symlink(network_models_path, comfyui_models)
-        print(f"✅ Создана символическая ссылка: {comfyui_models} -> {network_models_path}")
-        return True
+        # Создаем ссылки на подпапки из Network Volume
+        linked_count = 0
+        for subdir in ["vae", "loras", "clip", "unet", "gguf", "checkpoints", "diffusion_models", "text_encoders"]:
+            network_subdir = os.path.join(network_models_path, subdir)
+            comfyui_subdir = os.path.join(comfyui_models, subdir)
+            
+            if os.path.exists(network_subdir):
+                # Если подпапка уже существует, проверяем что это не ссылка
+                if os.path.exists(comfyui_subdir):
+                    if os.path.islink(comfyui_subdir):
+                        # Удаляем старую ссылку
+                        os.unlink(comfyui_subdir)
+                    else:
+                        # Локальная папка существует - не трогаем
+                        print(f"⚠️ Папка {comfyui_subdir} уже существует локально, пропускаю")
+                        continue
+                
+                # Создаем символическую ссылку
+                os.symlink(network_subdir, comfyui_subdir)
+                print(f"✅ Создана ссылка: {comfyui_subdir} -> {network_subdir}")
+                linked_count += 1
+        
+        if linked_count > 0:
+            print(f"✅ Создано {linked_count} символических ссылок на подпапки models")
+            return True
+        else:
+            print(f"⚠️ Не найдено подпапок для создания ссылок в {network_models_path}")
     except Exception as e:
-        print(f"❌ Ошибка создания символической ссылки: {e}")
-        return False
+        print(f"⚠️ Ошибка создания ссылок на подпапки: {e}")
+    
+    # Вариант 2: Создаем extra_model_paths.yaml для ComfyUI
+    # Это альтернативный способ - ComfyUI будет искать модели в дополнительных путях
+    try:
+        extra_model_paths_file = os.path.join(COMFYUI_DIR, "extra_model_paths.yaml")
+        if not os.path.exists(extra_model_paths_file):
+            import yaml
+            extra_paths_config = {
+                "base_path": str(network_models_path),
+                "models": {
+                    "checkpoints": ["checkpoints"],
+                    "vae": ["vae"],
+                    "loras": ["loras"],
+                    "upscale_models": ["upscale_models"],
+                    "controlnet": ["controlnet"],
+                    "clip": ["clip"],
+                    "unet": ["unet"],
+                    "gguf": ["gguf"],
+                    "text_encoders": ["text_encoders"],
+                    "diffusion_models": ["diffusion_models"]
+                }
+            }
+            
+            with open(extra_model_paths_file, 'w') as f:
+                yaml.dump(extra_paths_config, f, default_flow_style=False)
+            print(f"✅ Создан extra_model_paths.yaml: {extra_model_paths_file}")
+            print(f"   Указывает на Network Volume: {network_models_path}")
+            return True
+    except ImportError:
+        print("⚠️ PyYAML не установлен, не могу создать extra_model_paths.yaml")
+    except Exception as e:
+        print(f"⚠️ Ошибка создания extra_model_paths.yaml: {e}")
+    
+    return False
 
 def start_comfyui():
     """Запускает ComfyUI в фоновом режиме с логированием"""
@@ -240,20 +276,41 @@ def start_comfyui():
     os.chdir(COMFYUI_DIR)
     
     # Запускаем с логированием в реальном времени
+    # Добавляем --enable-cors-header для работы с API
     process = subprocess.Popen(
-        ["python", "main.py", "--listen", "127.0.0.1", "--port", str(COMFYUI_PORT)],
+        ["python", "main.py", "--listen", "127.0.0.1", "--port", str(COMFYUI_PORT), "--enable-cors-header", "*"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,  # Объединяем stderr в stdout
         universal_newlines=True,
-        bufsize=1  # Line buffered
+        bufsize=1,  # Line buffered
+        env=dict(os.environ, PYTHONUNBUFFERED="1")  # Отключаем буферизацию для реального времени
     )
     
     # Запускаем поток для чтения логов
+    server_started = threading.Event()
+    
     def log_output():
         try:
             for line in iter(process.stdout.readline, ''):
                 if line:
-                    print(f"[ComfyUI] {line.rstrip()}")
+                    line_clean = line.rstrip()
+                    print(f"[ComfyUI] {line_clean}")
+                    
+                    # Проверяем, запустился ли сервер
+                    # ComfyUI выводит различные сообщения о запуске сервера
+                    server_indicators = [
+                        "Starting server",
+                        "To see the GUI go to",
+                        f"http://127.0.0.1:{COMFYUI_PORT}",
+                        "Starting ComfyUI",
+                        "Server started",
+                        "Listening on",
+                        "Running on",
+                        "Starting HTTP server"
+                    ]
+                    if any(indicator in line_clean for indicator in server_indicators):
+                        print(f"✅ ComfyUI сервер запустился! (найдено: {line_clean[:100]})")
+                        server_started.set()
         except Exception as e:
             print(f"❌ Ошибка чтения логов ComfyUI: {e}")
     
@@ -262,6 +319,10 @@ def start_comfyui():
     
     # Даем процессу немного времени на запуск
     time.sleep(2)
+    
+    # Ждем сигнала о запуске сервера (максимум 30 секунд)
+    if not server_started.wait(timeout=30):
+        print("⚠️ Не получен сигнал о запуске сервера из логов, продолжаем проверку через API...")
     
     # Проверяем, что процесс еще работает
     if process.poll() is not None:
