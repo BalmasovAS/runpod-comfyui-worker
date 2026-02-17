@@ -109,29 +109,30 @@ def setup_models_symlink(network_models_path):
         print(f"⚠️ Ошибка создания ссылок на подпапки: {e}")
     
     # Вариант 2: Создаем extra_model_paths.yaml для ComfyUI
-    # Это альтернативный способ - ComfyUI будет искать модели в дополнительных путях
+    # Правильный формат для ComfyUI: каждая секция должна иметь base_path и пути к папкам
     try:
         extra_model_paths_file = os.path.join(COMFYUI_DIR, "extra_model_paths.yaml")
         if not os.path.exists(extra_model_paths_file):
             import yaml
+            # Правильный формат для ComfyUI extra_model_paths.yaml
             extra_paths_config = {
-                "base_path": str(network_models_path),
-                "models": {
-                    "checkpoints": ["checkpoints"],
-                    "vae": ["vae"],
-                    "loras": ["loras"],
-                    "upscale_models": ["upscale_models"],
-                    "controlnet": ["controlnet"],
-                    "clip": ["clip"],
-                    "unet": ["unet"],
-                    "gguf": ["gguf"],
-                    "text_encoders": ["text_encoders"],
-                    "diffusion_models": ["diffusion_models"]
+                "a": {  # Имя секции (может быть любым, обычно 'a')
+                    "base_path": str(network_models_path),
+                    "checkpoints": "checkpoints",
+                    "vae": "vae",
+                    "loras": "loras",
+                    "upscale_models": "upscale_models",
+                    "controlnet": "controlnet",
+                    "clip": "clip",
+                    "unet": "unet",
+                    "gguf": "gguf",
+                    "text_encoders": "text_encoders",
+                    "diffusion_models": "diffusion_models"
                 }
             }
             
             with open(extra_model_paths_file, 'w') as f:
-                yaml.dump(extra_paths_config, f, default_flow_style=False)
+                yaml.dump(extra_paths_config, f, default_flow_style=False, sort_keys=False)
             print(f"✅ Создан extra_model_paths.yaml: {extra_model_paths_file}")
             print(f"   Указывает на Network Volume: {network_models_path}")
             return True
@@ -139,6 +140,8 @@ def setup_models_symlink(network_models_path):
         print("⚠️ PyYAML не установлен, не могу создать extra_model_paths.yaml")
     except Exception as e:
         print(f"⚠️ Ошибка создания extra_model_paths.yaml: {e}")
+        import traceback
+        traceback.print_exc()
     
     return False
 
