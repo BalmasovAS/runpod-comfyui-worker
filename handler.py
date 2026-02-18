@@ -158,16 +158,16 @@ def queue_prompt(prompt):
     print(f"📤 Отправляю в ComfyUI /prompt (первые 2000 символов):")
     print(prompt_str[:2000])
     
-    # Проверяем наличие узла RandomSeed в отправляемом workflow
+    # Проверяем наличие узла Seed Generator в отправляемом workflow
     if isinstance(prompt, dict):
-        seed_node_found = False
+        seed_gen_found = False
         for node_id, node_data in prompt.items():
-            if isinstance(node_data, dict) and node_data.get("class_type") == "RandomSeed":
-                seed_node_found = True
-                print(f"✅ Узел RandomSeed найден в отправляемом workflow: {node_id}")
+            if isinstance(node_data, dict) and node_data.get("class_type") == "Seed Generator":
+                seed_gen_found = True
+                print(f"✅ Узел Seed Generator найден в отправляемом workflow: {node_id}")
                 break
-        if not seed_node_found:
-            print("⚠️ Узел RandomSeed НЕ найден в отправляемом workflow!")
+        if not seed_gen_found:
+            print("⚠️ Узел Seed Generator НЕ найден в отправляемом workflow!")
             # Выводим все class_type для отладки
             all_types = {k: v.get("class_type") for k, v in prompt.items() if isinstance(v, dict)}
             print(f"   Все class_type в workflow: {list(all_types.values())[:20]}")
@@ -313,26 +313,33 @@ def apply_photo_params(workflow, params):
     # Обновляем seed
     if "seed" in params:
         seed_value = int(params["seed"])
-        # Ищем узел "RandomSeed" (стандартный узел ComfyUI)
-        found_id, node_data = find_node_by_type(workflow, "RandomSeed")
-        if found_id and "inputs" in workflow[found_id]:
-            # RandomSeed использует параметр seed
-            if "seed" in workflow[found_id]["inputs"]:
-                workflow[found_id]["inputs"]["seed"] = seed_value
-            print(f"✅ Seed обновлен в узле 'RandomSeed' (ID: {found_id}): {seed_value}")
-        else:
-            # Ищем узел с seed в inputs (для обратной совместимости)
-            found_id, node_data = find_node_by_input(workflow, "seed")
-            if found_id:
-                workflow[found_id]["inputs"]["seed"] = seed_value
-                print(f"✅ Seed обновлен в узле '{found_id}': {seed_value}")
-            else:
-                # Пробуем найти EmptyHunyuanLatentVideo
-                found_id, _ = find_node_by_type(workflow, "EmptyHunyuanLatentVideo")
-                if found_id and "inputs" in workflow[found_id]:
-                    if "seed" in workflow[found_id]["inputs"]:
-                        workflow[found_id]["inputs"]["seed"] = seed_value
-                        print(f"✅ Seed обновлен в узле '{found_id}': {seed_value}")
+        seed_updated = False
+        
+        # Ищем все узлы KSamplerAdvanced и обновляем noise_seed
+        for node_id, node_data in workflow.items():
+            if isinstance(node_data, dict) and node_data.get("class_type") == "KSamplerAdvanced":
+                if "inputs" in node_data and "noise_seed" in node_data["inputs"]:
+                    workflow[node_id]["inputs"]["noise_seed"] = seed_value
+                    print(f"✅ Seed обновлен в узле KSamplerAdvanced '{node_id}': {seed_value}")
+                    seed_updated = True
+        
+        if not seed_updated:
+            # Fallback: ищем узел с seed в любом месте
+            for node_id, node_data in workflow.items():
+                if isinstance(node_data, dict) and "inputs" in node_data:
+                    if "seed" in node_data["inputs"]:
+                        workflow[node_id]["inputs"]["seed"] = seed_value
+                        print(f"✅ Seed обновлен в узле '{node_id}': {seed_value}")
+                        seed_updated = True
+                        break
+                    elif "noise_seed" in node_data["inputs"]:
+                        workflow[node_id]["inputs"]["noise_seed"] = seed_value
+                        print(f"✅ Seed обновлен в узле '{node_id}': {seed_value}")
+                        seed_updated = True
+                        break
+        
+        if not seed_updated:
+            print(f"⚠️ Не удалось найти узел для обновления seed")
 
 def find_node_in_nodes(nodes, node_id=None, node_type=None, title_keyword=None):
     """Находит узел в массиве nodes по ID, типу или title"""
@@ -378,23 +385,30 @@ def apply_photo_params_to_nodes(nodes, params):
     # Обновляем seed (если нужно)
     if "seed" in params:
         seed_value = int(params["seed"])
-        # Ищем узел "RandomSeed" (стандартный узел ComfyUI)
         seed_updated = False
-        for node in nodes:
-            if node.get("type") == "RandomSeed":
-                if "inputs" in node and "seed" in node["inputs"]:
-                    node["inputs"]["seed"] = seed_value
-                    print(f"✅ Seed обновлен в узле 'RandomSeed' (ID: {node.get('id')}): {seed_value}")
-                    seed_updated = True
-                    break
         
-        # Если не нашли RandomSeed, ищем узел с seed в inputs
+        # Ищем все узлы KSamplerAdvanced и обновляем noise_seed
+        for node in nodes:
+            if node.get("type") == "KSamplerAdvanced":
+                if "inputs" in node and "noise_seed" in node["inputs"]:
+                    node["inputs"]["noise_seed"] = seed_value
+                    print(f"✅ Seed обновлен в узле KSamplerAdvanced (ID: {node.get('id')}): {seed_value}")
+                    seed_updated = True
+        
+        # Если не нашли KSamplerAdvanced, ищем узел с seed/noise_seed в inputs
         if not seed_updated:
             for node in nodes:
-                if "inputs" in node and "seed" in node["inputs"]:
-                    node["inputs"]["seed"] = seed_value
-                    print(f"✅ Seed обновлен в узле '{node.get('id')}': {seed_value}")
-                    break
+                if "inputs" in node:
+                    if "noise_seed" in node["inputs"]:
+                        node["inputs"]["noise_seed"] = seed_value
+                        print(f"✅ Seed (noise_seed) обновлен в узле '{node.get('id')}': {seed_value}")
+                        seed_updated = True
+                        break
+                    elif "seed" in node["inputs"]:
+                        node["inputs"]["seed"] = seed_value
+                        print(f"✅ Seed обновлен в узле '{node.get('id')}': {seed_value}")
+                        seed_updated = True
+                        break
 
 def apply_video_params_to_nodes(nodes, params):
     """Применяет параметры для видео к формату с nodes"""
@@ -448,76 +462,33 @@ def check_comfyui_server():
         return False
 
 def check_custom_nodes():
-    """Проверяет, какие custom nodes загружены в ComfyUI через object_info"""
-    try:
-        response = requests.get(f"{COMFYUI_URL}/object_info", timeout=10)
-        if response.status_code == 200:
-            object_info = response.json()
-            
-            # Логируем структуру object_info для отладки
-            print(f"📊 Структура object_info: {type(object_info)}")
-            if isinstance(object_info, dict):
-                print(f"   Ключи верхнего уровня (первые 20): {list(object_info.keys())[:20]}")
-            
-            # Ищем Seed Generator в object_info
-            # object_info может быть словарем, где ключи - это class_type узлов
-            all_node_types = []
-            if isinstance(object_info, dict):
-                # Проверяем, является ли это плоским словарем с class_type как ключами
-                # или вложенной структурой
-                for key, value in object_info.items():
-                    if isinstance(value, dict):
-                        # Если значение - словарь, это может быть информация об узле
-                        all_node_types.append(key)
-                    elif isinstance(value, list):
-                        # Если значение - список, это может быть список узлов
-                        all_node_types.append(key)
-            
-            # Проверяем наличие Seed Generator
-            if "Seed Generator" in all_node_types:
-                print(f"✅ Custom node 'Seed Generator' найден в object_info")
-                return True
-            else:
-                print(f"⚠️ Custom node 'Seed Generator' НЕ найден в object_info")
-                print(f"   Всего типов узлов: {len(all_node_types)}")
-                print(f"   Доступные типы узлов (первые 50): {all_node_types[:50]}")
-                # Ищем похожие названия
-                similar = [t for t in all_node_types if "seed" in t.lower() or "generator" in t.lower()]
-                if similar:
-                    print(f"   Похожие узлы: {similar}")
-                # Выводим полный список для отладки (первые 100)
-                print(f"   Полный список узлов (первые 100): {all_node_types[:100]}")
-                return False
-        else:
-            print(f"⚠️ object_info вернул статус {response.status_code}")
-            return False
-    except Exception as e:
-        print(f"⚠️ Ошибка проверки custom nodes: {e}")
-        import traceback
-        traceback.print_exc()
-        return False
-
-def check_custom_nodes():
     """Проверяет, какие custom nodes загружены в ComfyUI"""
     try:
         response = requests.get(f"{COMFYUI_URL}/object_info", timeout=10)
         if response.status_code == 200:
             object_info = response.json()
-            # Ищем Seed Generator в object_info
-            all_node_types = []
-            for category, nodes in object_info.items():
-                if isinstance(nodes, dict) and "input" in nodes:
-                    all_node_types.append(category)
             
-            # Проверяем наличие Seed Generator
-            if "Seed Generator" in all_node_types:
-                print(f"✅ Custom node 'Seed Generator' найден в object_info")
-                return True
-            else:
-                print(f"⚠️ Custom node 'Seed Generator' НЕ найден в object_info")
-                print(f"   Доступные типы узлов (первые 30): {all_node_types[:30]}")
-                return False
-        return False
+            # Логируем структуру object_info
+            print(f"📊 Структура object_info: {type(object_info)}")
+            if isinstance(object_info, dict):
+                all_node_types = list(object_info.keys())
+                print(f"   Доступные типы узлов (первые 50): {all_node_types[:50]}")
+                
+                # Проверяем наличие KSamplerAdvanced (это тот узел, который используем для seed)
+                if "KSamplerAdvanced" in all_node_types:
+                    print(f"✅ Узел 'KSamplerAdvanced' найден в object_info")
+                    return True
+                else:
+                    print(f"⚠️ Узел 'KSamplerAdvanced' НЕ найден в object_info")
+                    # Ищем похожие названия
+                    similar = [t for t in all_node_types if "sampler" in t.lower() or "ksample" in t.lower()]
+                    if similar:
+                        print(f"   Похожие узлы: {similar}")
+                    return False
+            return False
+        else:
+            print(f"⚠️ object_info вернул статус {response.status_code}")
+            return False
     except Exception as e:
         print(f"⚠️ Ошибка проверки custom nodes: {e}")
         return False
@@ -605,30 +576,31 @@ def handler(job):
                 node_ids_in_workflow = {str(node.get("id")) for node in workflow_to_send.get("nodes", [])}
                 print(f"📋 Workflow содержит {len(workflow_to_send.get('nodes', []))} узлов")
                 
-                # Проверяем наличие узла RandomSeed
-                seed_nodes = [node for node in workflow_to_send.get("nodes", []) if node.get("type") == "RandomSeed"]
-                if seed_nodes:
-                    print(f"✅ Найден узел RandomSeed в формате nodes: {[n.get('id') for n in seed_nodes]}")
+                # Проверяем наличие узлов KSamplerAdvanced (для seed)
+                ksample_nodes = [node for node in workflow_to_send.get("nodes", []) if node.get("type") == "KSamplerAdvanced"]
+                if ksample_nodes:
+                    print(f"✅ Найдены узлы KSamplerAdvanced: {[n.get('id') for n in ksample_nodes]}")
                 else:
-                    print("⚠️ Узел RandomSeed не найден в workflow (формат nodes)")
+                    print("⚠️ Узлы KSamplerAdvanced не найдены в workflow (формат nodes)")
             else:
                 # Плоский формат - проверяем наличие всех узлов
                 node_ids_in_workflow = set(workflow_to_send.keys())
                 print(f"📋 Workflow содержит {len(workflow_to_send)} узлов")
                 
-                # Проверяем наличие узла RandomSeed
-                seed_nodes = [k for k, v in workflow_to_send.items() if isinstance(v, dict) and v.get("class_type") == "RandomSeed"]
-                if seed_nodes:
-                    print(f"✅ Найден узел RandomSeed: {seed_nodes}")
-                    # Проверяем содержимое узла
-                    for node_id in seed_nodes:
-                        node_data = workflow_to_send[node_id]
-                        print(f"   Узел {node_id}: class_type={node_data.get('class_type')}, inputs={node_data.get('inputs', {})}")
+                # Проверяем наличие узлов KSamplerAdvanced
+                ksample_nodes = [k for k, v in workflow_to_send.items() if isinstance(v, dict) and v.get("class_type") == "KSamplerAdvanced"]
+                if ksample_nodes:
+                    print(f"✅ Найдены узлы KSamplerAdvanced: {ksample_nodes}")
+                    # Проверяем содержимое первого узла
+                    first_node_id = ksample_nodes[0]
+                    node_data = workflow_to_send[first_node_id]
+                    noise_seed = node_data.get('inputs', {}).get('noise_seed', 'not found')
+                    print(f"   Узел {first_node_id}: noise_seed={noise_seed}")
                 else:
-                    print("⚠️ Узел RandomSeed не найден в workflow (плоский формат)")
-                    # Выводим все class_type для отладки
+                    print("⚠️ Узлы KSamplerAdvanced не найдены в workflow (плоский формат)")
+                    # Выводим структуру для отладки
                     all_class_types = {k: v.get("class_type") for k, v in workflow_to_send.items() if isinstance(v, dict)}
-                    print(f"   Все class_type в workflow: {all_class_types}")
+                    print(f"   Доступные узлы: {list(all_class_types.values())}")
         
         # Логируем первые 1000 символов workflow для отладки
         workflow_str = json.dumps(workflow_to_send)

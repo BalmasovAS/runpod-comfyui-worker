@@ -25,7 +25,7 @@ WORKDIR /workspace/ComfyUI/custom_nodes
 
 RUN git clone https://github.com/1038lab/ComfyUI-QwenTTS.git && \
     git clone https://github.com/Comfy-Org/ComfyUI-Manager.git && \
-    git clone https://github.com/city96/ComfyUI-GGUF.git && \
+    git clone https://github.com/kijai/ComfyUI-GGUF.git && \
     cd ComfyUI-GGUF && \
     pip install -r requirements.txt || echo "No requirements.txt" && \
     cd .. && \
