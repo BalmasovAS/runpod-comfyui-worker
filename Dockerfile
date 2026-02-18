@@ -125,14 +125,22 @@ RUN echo "Installing custom ComfyUI nodes..." && \
     cd /comfyui/custom_nodes && \
     echo "Cloning ComfyUI-WanVideoWrapper..." && \
     git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git && \
+    cd ComfyUI-WanVideoWrapper && \
+    uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
+    cd .. && \
     echo "Cloning ComfyUI-KJNodes..." && \
     git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
+    cd ComfyUI-KJNodes && \
+    uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
+    cd .. && \
     echo "Cloning ComfyUI-GGUF..." && \
     git clone https://github.com/city96/ComfyUI-GGUF.git && \
+    cd ComfyUI-GGUF && \
+    uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
+    cd .. && \
     echo "Cloning RES4LYF..." && \
     git clone https://github.com/ClownsharkBatwing/RES4LYF.git && \
-    echo "Installing GGUF dependencies..." && \
-    cd ComfyUI-GGUF && \
+    cd RES4LYF && \
     uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
     cd .. && \
     echo "✅ Custom nodes installed successfully"
