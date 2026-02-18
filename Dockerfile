@@ -26,6 +26,7 @@ WORKDIR /workspace/ComfyUI/custom_nodes
 RUN git clone https://github.com/1038lab/ComfyUI-QwenTTS.git && \
     git clone https://github.com/Comfy-Org/ComfyUI-Manager.git && \
     git clone https://github.com/city96/ComfyUI-GGUF.git && \
+    git clone https://github.com/ClownsharkBatwing/RES4LYF.git && \
     cd ComfyUI-GGUF && \
     pip install -r requirements.txt || echo "No requirements.txt" && \
     cd .. && \
@@ -61,6 +62,7 @@ RUN git clone https://github.com/1038lab/ComfyUI-QwenTTS.git && \
 WORKDIR /workspace
 COPY handler.py /workspace/handler.py
 COPY workflows/ /workspace/ComfyUI/workflows/
+COPY patch_res4lyf.py /workspace/ComfyUI/custom_nodes/patch_res4lyf.py
 COPY start.sh /workspace/start.sh
 
 # Делаем start.sh исполняемым

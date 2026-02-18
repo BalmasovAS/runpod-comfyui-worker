@@ -89,7 +89,7 @@
   "35": {
     "inputs": {
       "add_noise": "enable",
-      "noise_seed": -1,
+      "noise_seed": 0,
       "steps": 10,
       "cfg": 1,
       "sampler_name": "res_2s",
@@ -122,7 +122,7 @@
   "36": {
     "inputs": {
       "add_noise": "enable",
-      "noise_seed": -1,
+      "noise_seed": 0,
       "steps": 10,
       "cfg": 1,
       "sampler_name": "res_2s",
