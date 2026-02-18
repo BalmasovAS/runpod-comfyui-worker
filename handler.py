@@ -565,7 +565,7 @@ def handler(job):
             }
         
         # Ждем завершения генерации
-        max_wait = 300  # 5 минут максимум
+        max_wait = 900  # 15 минут максимум (для больших моделей с компиляцией)
         start_time = time.time()
         
         while time.time() - start_time < max_wait:
