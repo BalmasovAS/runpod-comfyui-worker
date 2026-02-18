@@ -430,7 +430,7 @@ def handler(job):
                 all_node_types = list(object_info.keys())
                 
                 # Проверяем узлы, которые используются в workflow
-                required_nodes = ["TorchCompileModelWanVideoV2", "PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo"]
+                required_nodes = ["PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo"]
                 missing_nodes = []
                 for node_type in required_nodes:
                     if node_type not in all_node_types:
