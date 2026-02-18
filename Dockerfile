@@ -23,12 +23,14 @@ ENV PYTHONUNBUFFERED=1
 ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
 # Install Python, git and other necessary tools
+# Including build-essential for C compiler (needed for Triton/PyTorch compilation)
 RUN apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
     git \
     wget \
     curl \
+    build-essential \
     libgl1 \
     libglib2.0-0 \
     libsm6 \
