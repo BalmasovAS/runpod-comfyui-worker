@@ -642,19 +642,58 @@ def handler(job):
                     error_msg = status.get("error", "Неизвестная ошибка")
                     print(f"❌ Генерация провалилась: {error_msg}")
                     
+                    # Выводим детали ошибки
+                    if "node_errors" in history_data:
+                        print(f"📋 Ошибки в узлах: {history_data['node_errors']}")
+                    
                     return {
                         "status": "failed",
-                        "error": error_msg
+                        "error": error_msg,
+                        "details": history_data
                     }
+            else:
+                # Prompt ID не найден в истории - возможно, еще не начал выполняться
+                # Проверяем через /queue
+                try:
+                    queue_response = requests.get(f"{COMFYUI_URL}/queue")
+                    if queue_response.status_code == 200:
+                        queue_data = queue_response.json()
+                        running = queue_data.get("queue_running", [])
+                        pending = queue_data.get("queue_pending", [])
+                        
+                        # Ищем наш prompt_id в очереди
+                        found_in_running = any(item[1] == prompt_id for item in running)
+                        found_in_pending = any(item[1] == prompt_id for item in pending)
+                        
+                        if found_in_running:
+                            print(f"🔄 Задача выполняется (в queue_running)")
+                        elif found_in_pending:
+                            print(f"⏳ Задача в очереди (в queue_pending)")
+                        else:
+                            print(f"⚠️ Prompt ID {prompt_id} не найден в очереди")
+                except Exception as e:
+                    print(f"⚠️ Не удалось проверить очередь: {e}")
             
-            time.sleep(1)
+            time.sleep(2)  # Увеличено до 2 секунд, чтобы не перегружать API
         
         # Таймаут
-        print("⏱️ Превышено время ожидания генерации")
+        elapsed_minutes = int((time.time() - start_time) / 60)
+        print(f"⏱️ Превышено время ожидания генерации ({elapsed_minutes} минут)")
+        
+        # Пытаемся получить последний статус перед таймаутом
+        try:
+            history = get_history(prompt_id)
+            if prompt_id in history:
+                history_data = history[prompt_id]
+                status = history_data.get("status", {})
+                print(f"📊 Последний статус: {status}")
+        except Exception as e:
+            print(f"⚠️ Не удалось получить последний статус: {e}")
         
         return {
             "status": "timeout",
-            "error": "Превышено время ожидания генерации"
+            "error": f"Превышено время ожидания генерации ({elapsed_minutes} минут)",
+            "elapsed_seconds": int(time.time() - start_time)
         }
         
     except Exception as e:
