@@ -71,29 +71,9 @@ WORKDIR /comfyui
 # Support for the network volume
 COPY extra_model_paths.yaml ./
 
-# --- SYMLINK IMPLEMENTATION START ---
-# Create symbolic links to the Network Volume mount point (/runpod-volume)
-# This fools ComfyUI into thinking the models are local.
-RUN mkdir -p /runpod-volume/loras /runpod-volume/vae /runpod-volume/diffusion_models /runpod-volume/text_encoders /runpod-volume/controlnet /runpod-volume/upscale_models
-
-# LoRAs
-RUN ln -s /runpod-volume/loras /comfyui/models/loras
-
-# VAEs
-RUN ln -s /runpod-volume/vae /comfyui/models/vae
-
-# UNETs / Diffusion Models
-RUN ln -s /runpod-volume/diffusion_models /comfyui/models/diffusion_models
-
-# CLIP / Text Encoders
-RUN ln -s /runpod-volume/text_encoders /comfyui/models/text_encoders
-
-# ControlNet
-RUN ln -s /runpod-volume/controlnet /comfyui/models/controlnet
-
-# Upscale Models
-RUN ln -s /runpod-volume/upscale_models /comfyui/models/upscale_models
-# --- SYMLINK IMPLEMENTATION END ---
+# Create model directories structure (symlinks will be created at runtime in start.sh)
+# Network Volume is mounted at runtime, so we can't create symlinks during build
+RUN mkdir -p /comfyui/models/{loras,vae,diffusion_models,text_encoders,controlnet,upscale_models,unet}
 
 # Go back to the root
 WORKDIR /

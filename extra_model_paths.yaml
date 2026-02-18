@@ -12,3 +12,16 @@ a1:
   diffusion_models: diffusion_models
   controlnet: controlnet
   upscale_models: upscale_models
+  unet: unet
+
+# Also check ComfyUI/models structure if it exists
+a2:
+  base_path: /runpod-volume/ComfyUI/models
+  checkpoints: checkpoints
+  loras: loras
+  vae: vae
+  clip: clip
+  embeddings: embeddings
+  controlnet: controlnet
+  upscale_models: upscale_models
+  unet: unet
