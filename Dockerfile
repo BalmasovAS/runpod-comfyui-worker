@@ -47,6 +47,14 @@ RUN git clone https://github.com/1038lab/ComfyUI-QwenTTS.git && \
     cd .. && \
     git clone https://github.com/rgthree/rgthree-comfy.git && \
     cd rgthree-comfy && \
+    pip install -r requirements.txt || echo "No requirements.txt" && \
+    cd .. && \
+    git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git && \
+    cd ComfyUI-WanVideoWrapper && \
+    pip install -r requirements.txt || echo "No requirements.txt" && \
+    cd .. && \
+    git clone https://github.com/ltdrdata/ComfyUI-Impact-Pack.git && \
+    cd ComfyUI-Impact-Pack && \
     pip install -r requirements.txt || echo "No requirements.txt"
 
 # Копируем ваш код
