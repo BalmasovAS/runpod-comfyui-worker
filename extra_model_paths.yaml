@@ -1,0 +1,14 @@
+# Extra Model Paths for Wan Video
+# This configuration allows ComfyUI to find models in custom locations
+
+a1:
+  base_path: /runpod-volume
+  model_paths:
+    checkpoints: diffusion_models
+    loras: loras
+    vae: vae
+    clip: text_encoders
+    embeddings: embeddings
+    diffusion_models: diffusion_models
+    controlnet: controlnet
+    upscale_models: upscale_models

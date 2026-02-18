@@ -1,137 +1,112 @@
-# ComfyUI Worker for RunPod Serverless
+# ComfyUI Wan Video - RunPod Serverless
 
-RunPod Serverless worker для ComfyUI с поддержкой Wan Video V2 и других custom nodes.
+Современный Dockerfile для ComfyUI с Wan Video support, построенный по стандартам из [comfuiStory](https://github.com/xHaileab/comfuiStory) и [qwen_img_8step](https://github.com/ZeroClue/qwen_img_8step).
 
-## Использование в RunPod
+## Особенности
 
-### Подключение GitHub репозитория
+- ✅ **comfy-cli** — современный способ установки ComfyUI
+- ✅ **uv** — быстрый установщик пакетов (в 10-100 раз быстрее pip)
+- ✅ **comfy-node-install** — установка custom nodes через registry.comfy.org
+- ✅ **Symbolic links** — модели из Network Volume доступны как локальные
+- ✅ **libtcmalloc** — улучшенное управление памятью
+- ✅ **ComfyUI-Manager offline mode** — отсутствие интернет-зависимостей
+- ✅ **RES4LYF** — кастомные sampler `res_2s` и scheduler `beta57` для Wan Video
 
-1. Загрузите этот репозиторий на GitHub:
-   ```bash
-   cd runpod-comfyui-worker
-   git init
-   git add .
-   git commit -m "Initial commit"
-   git remote add origin https://github.com/YOUR_USERNAME/runpod-comfyui-worker.git
-   git push -u origin main
-   ```
-
-2. В RunPod Console:
-   - Создайте новый Serverless Endpoint
-   - Выберите **"Build from GitHub repository"** или **"Repository"**
-   - Укажите URL вашего репозитория: `https://github.com/YOUR_USERNAME/runpod-comfyui-worker`
-   - Укажите ветку (обычно `main`)
-   - RunPod автоматически соберет образ из Dockerfile
-
-3. Настройте Network Volume:
-   - Подключите Network Volume к Endpoint
-   - Убедитесь, что на Network Volume есть структура:
-     ```
-     models/
-     ├── vae/
-     ├── loras/
-     ├── clip/
-     └── unet/ или gguf/
-     ```
-
-## Обновление кода
-
-После изменений в коде:
+## Сборка Docker образа
 
 ```bash
-git add .
-git commit -m "Update handler"
-git push
+# Базовая сборка (custom nodes устанавливаются автоматически)
+docker build -t your-registry/comfyui-wan:latest .
+
+# Сборка с кастомной версией ComfyUI
+docker build --build-arg COMFYUI_VERSION=v0.2.3 -t your-registry/comfyui-wan:latest .
 ```
 
-RunPod автоматически пересоберет образ при следующем запросе (или можно принудительно пересобрать в настройках Endpoint).
+## Развертывание на RunPod
 
-## API Использование
-
-### Синхронный запрос (runsync)
-
+1. Отправьте образ в реестр:
 ```bash
-curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input": {
-      "workflow": "photo",
-      "params": {
-        "prompt": "beautiful girl",
-        "negative_prompt": "low quality",
-        "seed": 12345
-      }
-    }
-  }' \
-  https://api.runpod.ai/v2/YOUR_ENDPOINT_ID/runsync
+docker push your-registry/comfyui-wan:latest
 ```
 
-### Асинхронный запрос (run)
+2. Создайте новый Serverless endpoint на RunPod:
+   - Выберите ваш Docker образ
+   - Укажите Network Volume с моделями
+   - Настройте минимальное/максимальное количество реплик
 
-```bash
-curl -X POST \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "input": {
-      "workflow": "photo",
-      "params": {
-        "prompt": "beautiful girl"
-      }
-    }
-  }' \
-  https://api.runpod.ai/v2/YOUR_ENDPOINT_ID/run
+## Структура моделей на Network Volume
+
+Модели должны находиться в следующих подпапках Network Volume:
+```
+/runpod-volume/
+├── diffusion_models/    # UNET модели
+├── loras/              # LoRA модели
+├── vae/                # VAE модели
+├── text_encoders/      # CLIP модели
+├── controlnet/         # ControlNet модели
+└── upscale_models/     # Модели апскейлинга
 ```
 
-Затем проверяйте статус через `/status` endpoint.
+## API запросы
 
-## Workflow Types
-
-- `photo` - генерация фото
-- `video` - генерация видео
-- `voice` - генерация голоса
-
-## Параметры
-
-### Photo workflow
-- `prompt` - позитивный промпт
-- `negative_prompt` - негативный промпт (опционально)
-- `seed` - seed для генерации (опционально)
-
-### Video workflow
-- `prompt` - промпт
-- `fps` - кадров в секунду (опционально)
-- `length` - длина видео (опционально)
-
-### Voice workflow
-- `prompt` - текст для генерации голоса
-- другие параметры в зависимости от workflow
-
-## Структура репозитория
-
+### Фото генерация
+```json
+{
+  "workflow": "photo",
+  "params": {
+    "prompt": "A beautiful landscape",
+    "negative_prompt": "blur, low quality",
+    "seed": 12345
+  }
+}
 ```
-runpod-comfyui-worker/
-├── Dockerfile          # Docker образ с ComfyUI и custom nodes
-├── handler.py          # RunPod serverless handler
-├── workflows/         # ComfyUI workflows (photo, video, voice)
-│   ├── photo.json
-│   ├── video.json
-│   └── voice.json
-└── README.md          # Этот файл
+
+### Видео генерация
+```json
+{
+  "workflow": "video",
+  "params": {
+    "prompt": "A woman walking in the park",
+    "fps": 24,
+    "length": 64
+  }
+}
 ```
+
+### Голос (TTS)
+```json
+{
+  "workflow": "voice",
+  "params": {
+    "prompt": "Hello, this is a test",
+    "speaker": "female"
+  }
+}
+```
+
+## Установленные Custom Nodes
+
+- `ComfyUI-WanVideoWrapper` — Wan Video поддержка
+- `ComfyUI-KJNodes` — Дополнительные узлы от KJ
+- `city96/ComfyUI-GGUF` — GGUF модели
+- `RES4LYF` — Кастомные sampler/scheduler (res_2s, beta57)
+
+## Переменные окружения
+
+- `COMFY_LOG_LEVEL` — уровень логирования (по умолчанию: DEBUG)
+- `SERVE_API_LOCALLY` — если true, запускает локальный API (по умолчанию: false)
 
 ## Troubleshooting
 
-Если модели не находятся:
-1. Проверьте, что Network Volume подключен к Endpoint
-2. Проверьте структуру папок на Network Volume
-3. Проверьте логи воркера в RunPod Console - там будет диагностика
+### Ошибка: Node 'Unet Loader (GGUF)' not found
+Решение: Custom node `city96/ComfyUI-GGUF` устанавливается автоматически. Проверьте логи сборки.
 
-## Преимущества GitHub репозитория
+### Ошибка: Value not in list (sampler_name: 'res_2s')
+Решение: Custom node `RES4LYF` устанавливается автоматически. Проверьте логи сборки.
 
-✅ **Не нужно собирать Docker образ локально** - RunPod соберет автоматически  
-✅ **Не нужно пушить в Docker Hub** - просто GitHub  
-✅ **Быстрые обновления** - просто `git push`  
-✅ **Автоматическая сборка** - RunPod пересоберет образ при изменениях  
-✅ **Проще разработка** - изменения видны сразу после push
+### Ошибка: Value not in list (scheduler: 'beta57')
+Решение: Патч автоматически применяется в `handler.py`. Убедитесь, что RES4LYF установлен и загружен.
+
+## Лицензия
+
+MIT

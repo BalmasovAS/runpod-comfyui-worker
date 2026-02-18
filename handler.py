@@ -4,149 +4,29 @@ import json
 import time
 import os
 import base64
+import sys
 
-# Путь к ComfyUI
-COMFYUI_DIR = "/workspace/ComfyUI"
+# Путь к ComfyUI (обновлен для нового Dockerfile)
+COMFYUI_DIR = "/comfyui"
 COMFYUI_PORT = 8188
 COMFYUI_URL = f"http://127.0.0.1:{COMFYUI_PORT}"
 
+# Добавляем ComfyUI в sys.path для импорта кастомных модулей
+sys.path.insert(0, COMFYUI_DIR)
+
+# Патч для RES4LYF: добавляем beta57 в стандартные scheduler
+try:
+    import comfy.samplers
+    if "beta57" not in comfy.samplers.SCHEDULER_NAMES:
+        comfy.samplers.SCHEDULER_NAMES.append("beta57")
+        print("[Handler] ✅ Патч применен: добавлен 'beta57' в SCHEDULER_NAMES")
+    else:
+        print("[Handler] ✅ Scheduler 'beta57' уже присутствует в SCHEDULER_NAMES")
+except Exception as e:
+    print(f"[Handler] ⚠️ Не удалось применить патч для beta57: {e}")
+
 # Стандартный путь к Network Volume в RunPod
-# RunPod автоматически монтирует Network Volume в /runpod-volume
-# Если Network Volume содержит папку models, она будет доступна по пути /runpod-volume/models
 RUNPOD_VOLUME_PATH = os.environ.get("RUNPOD_VOLUME_PATH", "/runpod-volume")
-COMFYUI_MODELS_PATH = os.path.join(COMFYUI_DIR, "models")
-
-# Удалены функции list_directory_recursive и check_network_volume_contents
-# Больше не нужны, так как путь к моделям известен
-
-def find_network_volume():
-    """Находит путь к Network Volume с моделями (известный путь)"""
-    print("\n" + "="*60)
-    print("🔍 Поиск Network Volume с моделями")
-    print("="*60)
-    
-    # Известный путь к моделям
-    models_path = os.path.join(RUNPOD_VOLUME_PATH, "ComfyUI", "models")
-    
-    if os.path.exists(models_path):
-        print(f"✅ Найдена папка models: {models_path}")
-        
-        # Быстрая проверка наличия типичных папок
-        try:
-            subdirs = [d for d in os.listdir(models_path) if os.path.isdir(os.path.join(models_path, d))]
-            model_subdirs = [d for d in subdirs if d in ["vae", "loras", "clip", "unet", "gguf", "checkpoints", "diffusion_models"]]
-            if model_subdirs:
-                print(f"   Подпапки с моделями: {', '.join(model_subdirs[:10])}")
-            return models_path
-        except Exception as e:
-            print(f"   ⚠️ Ошибка проверки: {e}")
-            return models_path  # Все равно возвращаем путь
-    
-    # Fallback: проверяем альтернативные пути
-    alternative_paths = [
-        os.path.join(RUNPOD_VOLUME_PATH, "models"),
-        RUNPOD_VOLUME_PATH,
-    ]
-    
-    for alt_path in alternative_paths:
-        if os.path.exists(alt_path):
-            try:
-                subdirs = [d for d in os.listdir(alt_path) if os.path.isdir(os.path.join(alt_path, d))]
-                if any(d in ["vae", "loras", "clip", "unet", "gguf"] for d in subdirs):
-                    print(f"✅ Найдена папка models (альтернативный путь): {alt_path}")
-                    return alt_path
-            except:
-                continue
-    
-    print(f"⚠️ Папка models не найдена")
-    print(f"   Проверенные пути: {models_path}, {alternative_paths}")
-    return None
-
-def setup_models_symlink(network_models_path):
-    """
-    Создает символические ссылки от Network Volume к ComfyUI models
-    Также создает extra_model_paths.yaml для ComfyUI, если нужно
-    """
-    if not network_models_path:
-        return False
-    
-    comfyui_models = os.path.join(COMFYUI_DIR, "models")
-    
-    # Вариант 1: Создаем символические ссылки на подпапки (более безопасно)
-    # Это позволяет сохранить локальную папку models и добавить Network Volume как дополнительный путь
-    try:
-        # Создаем папку models если её нет
-        os.makedirs(comfyui_models, exist_ok=True)
-        
-        # Создаем ссылки на подпапки из Network Volume
-        linked_count = 0
-        for subdir in ["vae", "loras", "clip", "unet", "gguf", "checkpoints", "diffusion_models", "text_encoders"]:
-            network_subdir = os.path.join(network_models_path, subdir)
-            comfyui_subdir = os.path.join(comfyui_models, subdir)
-            
-            if os.path.exists(network_subdir):
-                # Если подпапка уже существует, проверяем что это не ссылка
-                if os.path.exists(comfyui_subdir):
-                    if os.path.islink(comfyui_subdir):
-                        # Удаляем старую ссылку
-                        os.unlink(comfyui_subdir)
-                    else:
-                        # Локальная папка существует - не трогаем
-                        print(f"⚠️ Папка {comfyui_subdir} уже существует локально, пропускаю")
-                        continue
-                
-                # Создаем символическую ссылку
-                os.symlink(network_subdir, comfyui_subdir)
-                print(f"✅ Создана ссылка: {comfyui_subdir} -> {network_subdir}")
-                linked_count += 1
-        
-        if linked_count > 0:
-            print(f"✅ Создано {linked_count} символических ссылок на подпапки models")
-            return True
-        else:
-            print(f"⚠️ Не найдено подпапок для создания ссылок в {network_models_path}")
-    except Exception as e:
-        print(f"⚠️ Ошибка создания ссылок на подпапки: {e}")
-    
-    # Вариант 2: Создаем extra_model_paths.yaml для ComfyUI
-    # Правильный формат для ComfyUI: каждая секция должна иметь base_path и пути к папкам
-    try:
-        extra_model_paths_file = os.path.join(COMFYUI_DIR, "extra_model_paths.yaml")
-        if not os.path.exists(extra_model_paths_file):
-            import yaml
-            # Правильный формат для ComfyUI extra_model_paths.yaml
-            extra_paths_config = {
-                "a": {  # Имя секции (может быть любым, обычно 'a')
-                    "base_path": str(network_models_path),
-                    "checkpoints": "checkpoints",
-                    "vae": "vae",
-                    "loras": "loras",
-                    "upscale_models": "upscale_models",
-                    "controlnet": "controlnet",
-                    "clip": "clip",
-                    "unet": "unet",
-                    "gguf": "gguf",
-                    "text_encoders": "text_encoders",
-                    "diffusion_models": "diffusion_models"
-                }
-            }
-            
-            with open(extra_model_paths_file, 'w') as f:
-                yaml.dump(extra_paths_config, f, default_flow_style=False, sort_keys=False)
-            print(f"✅ Создан extra_model_paths.yaml: {extra_model_paths_file}")
-            print(f"   Указывает на Network Volume: {network_models_path}")
-            return True
-    except ImportError:
-        print("⚠️ PyYAML не установлен, не могу создать extra_model_paths.yaml")
-    except Exception as e:
-        print(f"⚠️ Ошибка создания extra_model_paths.yaml: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    return False
-
-# Функции start_comfyui, wait_for_comfyui, cleanup_comfyui удалены
-# ComfyUI теперь запускается через start.sh скрипт (как в comfuiStory)
 
 def queue_prompt(prompt):
     """Отправляет промпт в очередь ComfyUI"""
@@ -158,16 +38,22 @@ def queue_prompt(prompt):
     print(f"📤 Отправляю в ComfyUI /prompt (первые 2000 символов):")
     print(prompt_str[:2000])
     
-    # Проверяем наличие узла Seed Generator в отправляемом workflow
+    # Проверяем наличие узлов KSamplerAdvanced в отправляемом workflow
     if isinstance(prompt, dict):
-        seed_gen_found = False
+        ksample_nodes = []
         for node_id, node_data in prompt.items():
-            if isinstance(node_data, dict) and node_data.get("class_type") == "Seed Generator":
-                seed_gen_found = True
-                print(f"✅ Узел Seed Generator найден в отправляемом workflow: {node_id}")
-                break
-        if not seed_gen_found:
-            print("⚠️ Узел Seed Generator НЕ найден в отправляемом workflow!")
+            if isinstance(node_data, dict) and node_data.get("class_type") == "KSamplerAdvanced":
+                ksample_nodes.append(node_id)
+                inputs = node_data.get("inputs", {})
+                sampler = inputs.get("sampler_name", "unknown")
+                scheduler = inputs.get("scheduler", "unknown")
+                seed = inputs.get("noise_seed", "unknown")
+                print(f"   Узел {node_id}: sampler={sampler}, scheduler={scheduler}, seed={seed}")
+        
+        if ksample_nodes:
+            print(f"✅ Найдены узлы KSamplerAdvanced: {ksample_nodes}")
+        else:
+            print("⚠️ Узлы KSamplerAdvanced НЕ найдены в workflow!")
             # Выводим все class_type для отладки
             all_types = {k: v.get("class_type") for k, v in prompt.items() if isinstance(v, dict)}
             print(f"   Все class_type в workflow: {list(all_types.values())[:20]}")
@@ -450,11 +336,8 @@ def apply_voice_params_to_nodes(nodes, params):
                 print(f"✅ Параметр '{param_key}' обновлен в узле '{node.get('id')}': {param_value}")
                 break
 
-# Функция cleanup_comfyui удалена
-# ComfyUI остается запущенным для следующих запросов (как в comfuiStory)
-
 def check_comfyui_server():
-    """Проверяет доступность ComfyUI сервера (как в comfuiStory)"""
+    """Проверяет доступность ComfyUI сервера"""
     try:
         response = requests.get(f"{COMFYUI_URL}/system_stats", timeout=5)
         return response.status_code == 200
@@ -474,9 +357,34 @@ def check_custom_nodes():
                 all_node_types = list(object_info.keys())
                 print(f"   Доступные типы узлов (первые 50): {all_node_types[:50]}")
                 
-                # Проверяем наличие KSamplerAdvanced (это тот узел, который используем для seed)
+                # Проверяем наличие KSamplerAdvanced
                 if "KSamplerAdvanced" in all_node_types:
                     print(f"✅ Узел 'KSamplerAdvanced' найден в object_info")
+                    
+                    # Проверяем параметры KSamplerAdvanced
+                    ksampler_info = object_info.get("KSamplerAdvanced", {})
+                    input_info = ksampler_info.get("input", {})
+                    
+                    # Проверяем доступные sampler_name
+                    sampler_required = input_info.get("sampler_name", {})
+                    if isinstance(sampler_required, list) and len(sampler_required) > 0:
+                        samplers = sampler_required[0].get("list", [])
+                        print(f"   Доступные samplers (первые 20): {samplers[:20]}")
+                        if "res_2s" in samplers:
+                            print(f"   ✅ Sampler 'res_2s' найден!")
+                        else:
+                            print(f"   ⚠️ Sampler 'res_2s' НЕ найден!")
+                    
+                    # Проверяем доступные scheduler
+                    scheduler_required = input_info.get("scheduler", {})
+                    if isinstance(scheduler_required, list) and len(scheduler_required) > 0:
+                        schedulers = scheduler_required[0].get("list", [])
+                        print(f"   Доступные schedulers (первые 20): {schedulers[:20]}")
+                        if "beta57" in schedulers:
+                            print(f"   ✅ Scheduler 'beta57' найден!")
+                        else:
+                            print(f"   ⚠️ Scheduler 'beta57' НЕ найден!")
+                    
                     return True
                 else:
                     print(f"⚠️ Узел 'KSamplerAdvanced' НЕ найден в object_info")
@@ -491,18 +399,17 @@ def check_custom_nodes():
             return False
     except Exception as e:
         print(f"⚠️ Ошибка проверки custom nodes: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 def handler(job):
     """
     Handler для RunPod Serverless
-    Принимает запрос с workflow и параметрами
-    
     ComfyUI должен быть уже запущен через start.sh скрипт
-    (как в comfuiStory подходе)
     """
     try:
-        # Проверяем, что ComfyUI доступен (как в comfuiStory)
+        # Проверяем, что ComfyUI доступен
         if not check_comfyui_server():
             return {
                 "error": "ComfyUI сервер недоступен. Убедитесь, что ComfyUI запущен."
@@ -537,13 +444,8 @@ def handler(job):
             workflow_data = json.load(f)
         
         # Определяем формат workflow (с nodes или без)
-        # Формат 1: плоский объект {"3": {...}, "4": {...}}
-        # Формат 2: с nodes {"nodes": [{...}], ...}
-        
-        # Для формата с nodes работаем напрямую, не конвертируя
-        # Это важно, чтобы сохранить widgets_values и другие поля
         if "nodes" in workflow_data:
-            # Работаем напрямую с nodes, обновляя только нужные параметры
+            # Работаем напрямую с nodes
             workflow_to_send = json.loads(json.dumps(workflow_data))  # Глубокая копия
             
             # Применяем параметры напрямую к nodes
@@ -572,35 +474,23 @@ def handler(job):
         # Проверяем, что все узлы присутствуют в workflow
         if isinstance(workflow_to_send, dict):
             if "nodes" in workflow_to_send:
-                # Формат с nodes - проверяем наличие всех узлов
                 node_ids_in_workflow = {str(node.get("id")) for node in workflow_to_send.get("nodes", [])}
                 print(f"📋 Workflow содержит {len(workflow_to_send.get('nodes', []))} узлов")
                 
-                # Проверяем наличие узлов KSamplerAdvanced (для seed)
                 ksample_nodes = [node for node in workflow_to_send.get("nodes", []) if node.get("type") == "KSamplerAdvanced"]
                 if ksample_nodes:
                     print(f"✅ Найдены узлы KSamplerAdvanced: {[n.get('id') for n in ksample_nodes]}")
-                else:
-                    print("⚠️ Узлы KSamplerAdvanced не найдены в workflow (формат nodes)")
             else:
-                # Плоский формат - проверяем наличие всех узлов
                 node_ids_in_workflow = set(workflow_to_send.keys())
                 print(f"📋 Workflow содержит {len(workflow_to_send)} узлов")
                 
-                # Проверяем наличие узлов KSamplerAdvanced
                 ksample_nodes = [k for k, v in workflow_to_send.items() if isinstance(v, dict) and v.get("class_type") == "KSamplerAdvanced"]
                 if ksample_nodes:
                     print(f"✅ Найдены узлы KSamplerAdvanced: {ksample_nodes}")
-                    # Проверяем содержимое первого узла
                     first_node_id = ksample_nodes[0]
                     node_data = workflow_to_send[first_node_id]
                     noise_seed = node_data.get('inputs', {}).get('noise_seed', 'not found')
                     print(f"   Узел {first_node_id}: noise_seed={noise_seed}")
-                else:
-                    print("⚠️ Узлы KSamplerAdvanced не найдены в workflow (плоский формат)")
-                    # Выводим структуру для отладки
-                    all_class_types = {k: v.get("class_type") for k, v in workflow_to_send.items() if isinstance(v, dict)}
-                    print(f"   Доступные узлы: {list(all_class_types.values())}")
         
         # Логируем первые 1000 символов workflow для отладки
         workflow_str = json.dumps(workflow_to_send)
@@ -661,7 +551,7 @@ def handler(job):
                 if status.get("completed"):
                     # Генерация завершена
                     outputs = history_data.get("outputs", {})
-                    files = []  # Может содержать изображения, видео или аудио
+                    files = []
                     
                     # Собираем все файлы (изображения, видео, аудио)
                     for node_id, node_output in outputs.items():
@@ -673,7 +563,6 @@ def handler(job):
                                 folder_type = image_info.get("type", "output")
                                 
                                 file_data = get_image(filename, subfolder, folder_type)
-                                # Конвертируем в base64 для отправки
                                 file_base64 = base64.b64encode(file_data).decode('utf-8')
                                 files.append({
                                     "filename": filename,
@@ -688,7 +577,6 @@ def handler(job):
                                 subfolder = video_info.get("subfolder", "")
                                 folder_type = video_info.get("type", "output")
                                 
-                                # Используем get_image для получения видео (тот же endpoint)
                                 file_data = get_image(filename, subfolder, folder_type)
                                 file_base64 = base64.b64encode(file_data).decode('utf-8')
                                 files.append({
@@ -704,7 +592,7 @@ def handler(job):
                             subfolder = audio_info.get("subfolder", "")
                             folder_type = audio_info.get("type", "output")
                             
-                            file_data = get_image(filename, subfolder, folder_type)  # Тот же endpoint
+                            file_data = get_image(filename, subfolder, folder_type)
                             file_base64 = base64.b64encode(file_data).decode('utf-8')
                             files.append({
                                 "filename": filename,
@@ -712,16 +600,13 @@ def handler(job):
                                 "type": "audio"
                             })
                     
-                    # ComfyUI остается запущенным для следующих запросов
-                    # (как в comfuiStory подходе)
-                    
                     print("✅ Генерация завершена успешно")
                     
                     return {
                         "status": "completed",
                         "prompt_id": prompt_id,
-                        "files": files,  # Универсальное поле для всех типов файлов
-                        "images": files,  # Обратная совместимость
+                        "files": files,
+                        "images": files,
                         "outputs": outputs
                     }
                 
@@ -746,7 +631,6 @@ def handler(job):
         }
         
     except Exception as e:
-        # Обрабатываем ошибки без завершения ComfyUI
         error_type = type(e).__name__
         error_msg = str(e)
         print(f"❌ Критическая ошибка в handler: {error_type}: {error_msg}")
@@ -758,6 +642,5 @@ def handler(job):
         }
 
 # Запускаем RunPod serverless
-# RunPod requires runpod.serverless.start() to be called
 if __name__ == "__main__":
     runpod.serverless.start({"handler": handler})

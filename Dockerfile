@@ -1,76 +1,141 @@
-# Используем базовый образ RunPod с PyTorch
-FROM runpod/pytorch:2.4.0-py3.11-cuda12.4.1-devel-ubuntu22.04
+# Build argument for base image selection
+ARG BASE_IMAGE=nvidia/cuda:12.6.3-cudnn-runtime-ubuntu24.04
 
-# Устанавливаем системные пакеты
-RUN apt-get update -y && \
-    apt-get install -y git wget ffmpeg libgl1-mesa-glx && \
-    rm -rf /var/lib/apt/lists/*
+# Stage 1: Base image with common dependencies
+FROM ${BASE_IMAGE} AS base
 
-WORKDIR /workspace
+# Build arguments for this stage with sensible defaults for standalone builds
+ARG COMFYUI_VERSION=latest
+ARG CUDA_VERSION_FOR_COMFY
+ARG ENABLE_PYTORCH_UPGRADE=false
+ARG PYTORCH_INDEX_URL
 
-# Клонируем ComfyUI
-RUN git clone https://github.com/comfyanonymous/ComfyUI.git ComfyUI && \
-    cd ComfyUI && \
-    pip install -r requirements.txt
+# Prevents prompts from packages asking for user input during installation
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Исправляем совместимость torchvision с PyTorch
-RUN pip uninstall -y torchvision && \
-    pip install torchvision>=0.20.0 --index-url https://download.pytorch.org/whl/cu128
+# Prefer binary wheels over source distributions for faster pip installations
+ENV PIP_PREFER_BINARY=1
 
-# Устанавливаем RunPod SDK и PyYAML для extra_model_paths.yaml
-RUN pip install runpod requests pyyaml
+# Ensures output from python is printed immediately to the terminal without buffering
+ENV PYTHONUNBUFFERED=1
 
-# Устанавливаем custom nodes
-WORKDIR /workspace/ComfyUI/custom_nodes
+# Speed up some cmake builds
+ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 
-RUN git clone https://github.com/1038lab/ComfyUI-QwenTTS.git && \
-    git clone https://github.com/Comfy-Org/ComfyUI-Manager.git && \
-    git clone https://github.com/city96/ComfyUI-GGUF.git && \
-    git clone https://github.com/ClownsharkBatwing/RES4LYF.git && \
-    cd ComfyUI-GGUF && \
-    pip install -r requirements.txt || echo "No requirements.txt" && \
-    cd .. && \
-    git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
-    cd ComfyUI-KJNodes && \
-    pip install -r requirements.txt || echo "No requirements.txt" && \
-    cd .. && \
-    git clone https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite.git && \
-    cd ComfyUI-VideoHelperSuite && \
-    pip install -r requirements.txt || echo "No requirements.txt" && \
-    cd .. && \
-    git clone https://github.com/tencent-ailab/hunyuan-comfyui.git ComfyUI-HunyuanVideo && \
-    cd ComfyUI-HunyuanVideo && \
-    pip install -r requirements.txt || echo "No requirements.txt" && \
-    cd .. && \
-    git clone https://github.com/crystian/ComfyUI-Crystools.git && \
-    cd ComfyUI-Crystools && \
-    pip install -r requirements.txt || echo "No requirements.txt" && \
-    cd .. && \
-    git clone https://github.com/rgthree/rgthree-comfy.git && \
-    cd rgthree-comfy && \
-    pip install -r requirements.txt || echo "No requirements.txt" && \
-    cd .. && \
-    git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git && \
-    cd ComfyUI-WanVideoWrapper && \
-    pip install -r requirements.txt || echo "No requirements.txt" && \
-    cd .. && \
-    git clone https://github.com/ltdrdata/ComfyUI-Impact-Pack.git && \
-    cd ComfyUI-Impact-Pack && \
-    pip install -r requirements.txt || echo "No requirements.txt"
+# Install Python, git and other necessary tools
+RUN apt-get update && apt-get install -y \
+    python3.12 \
+    python3.12-venv \
+    git \
+    wget \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender1 \
+    ffmpeg \
+    && ln -sf /usr/bin/python3.12 /usr/bin/python \
+    && ln -sf /usr/bin/pip3 /usr/bin/pip
 
-# Копируем ваш код
-WORKDIR /workspace
-COPY handler.py /workspace/handler.py
-COPY workflows/ /workspace/ComfyUI/workflows/
-COPY patch_res4lyf.py /workspace/ComfyUI/custom_nodes/patch_res4lyf.py
-COPY start.sh /workspace/start.sh
+# Clean up to reduce image size
+RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
 
-# Делаем start.sh исполняемым
-RUN chmod +x /workspace/start.sh
+# Install uv (latest) using official installer and create isolated venv
+RUN wget -qO- https://astral.sh/uv/install.sh | sh \
+    && ln -s /root/.local/bin/uv /usr/local/bin/uv \
+    && ln -s /root/.local/bin/uvx /usr/local/bin/uvx \
+    && uv venv /opt/venv
 
-# Устанавливаем curl для проверки ComfyUI
-RUN apt-get update -y && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Use the virtual environment for all subsequent commands
+ENV PATH="/opt/venv/bin:${PATH}"
 
-# Запускаем через start.sh (как в comfuiStory)
-# start.sh запустит ComfyUI в фоне, затем handler
-CMD ["/workspace/start.sh"]
+# Install comfy-cli + dependencies needed by it to install ComfyUI
+RUN uv pip install comfy-cli pip setuptools wheel
+
+# Install ComfyUI
+RUN if [ -n "${CUDA_VERSION_FOR_COMFY}" ]; then \
+    /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --cuda-version "${CUDA_VERSION_FOR_COMFY}" --nvidia; \
+    else \
+    /usr/bin/yes | comfy --workspace /comfyui install --version "${COMFYUI_VERSION}" --nvidia; \
+    fi
+
+# Upgrade PyTorch if needed (for newer CUDA versions)
+RUN if [ "$ENABLE_PYTORCH_UPGRADE" = "true" ]; then \
+    uv pip install --force-reinstall torch torchvision torchaudio --index-url ${PYTORCH_INDEX_URL}; \
+    fi
+
+# Change working directory to ComfyUI
+WORKDIR /comfyui
+
+# Support for the network volume
+COPY extra_model_paths.yaml ./
+
+# --- SYMLINK IMPLEMENTATION START ---
+# Create symbolic links to the Network Volume mount point (/runpod-volume)
+# This fools ComfyUI into thinking the models are local.
+RUN mkdir -p /runpod-volume/loras /runpod-volume/vae /runpod-volume/diffusion_models /runpod-volume/text_encoders /runpod-volume/controlnet /runpod-volume/upscale_models
+
+# LoRAs
+RUN ln -s /runpod-volume/loras /comfyui/models/loras
+
+# VAEs
+RUN ln -s /runpod-volume/vae /comfyui/models/vae
+
+# UNETs / Diffusion Models
+RUN ln -s /runpod-volume/diffusion_models /comfyui/models/diffusion_models
+
+# CLIP / Text Encoders
+RUN ln -s /runpod-volume/text_encoders /comfyui/models/text_encoders
+
+# ControlNet
+RUN ln -s /runpod-volume/controlnet /comfyui/models/controlnet
+
+# Upscale Models
+RUN ln -s /runpod-volume/upscale_models /comfyui/models/upscale_models
+# --- SYMLINK IMPLEMENTATION END ---
+
+# Go back to the root
+WORKDIR /
+
+# Install Python runtime dependencies for the handler
+RUN uv pip install runpod requests websocket-client pyyaml
+
+# Add application code and scripts
+COPY handler.py workflows/ ./
+COPY start.sh ./
+RUN chmod +x /start.sh
+
+# Add script to install custom nodes
+COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
+RUN chmod +x /usr/local/bin/comfy-node-install
+
+# Prevent pip from asking for confirmation during uninstall steps in custom nodes
+ENV PIP_NO_INPUT=1
+
+# Change working directory to ComfyUI
+WORKDIR /comfyui
+
+# Install custom nodes via comfy-cli (fixed list for Wan Video)
+# These are the required custom nodes for this project
+RUN echo "Installing custom ComfyUI nodes..." && \
+    /usr/local/bin/comfy-node-install \
+        ComfyUI-WanVideoWrapper \
+        ComfyUI-KJNodes \
+        city96/ComfyUI-GGUF \
+        RES4LYF \
+    || (echo "Failed to install custom nodes" && exit 1)
+
+# Go back to the root
+WORKDIR /
+
+# Copy helper script to switch Manager network mode at container start
+COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
+RUN chmod +x /usr/local/bin/comfy-manager-set-mode
+
+# Set the default command to run when starting the container
+CMD ["/start.sh"]
+
+# Stage 2: Final image
+FROM base AS final
+
+# Models will be downloaded on-demand at runtime to avoid build timeouts
