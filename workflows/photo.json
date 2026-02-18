@@ -98,7 +98,7 @@
       "end_at_step": 4,
       "return_with_leftover_noise": "disable",
       "model": [
-        "100",
+        "101",
         0
       ],
       "positive": [
@@ -245,29 +245,11 @@
       "title": "Загрузчик LoRA (Только модель)"
     }
   },
-  "100": {
-    "inputs": {
-      "backend": "inductor",
-      "fullgraph": false,
-      "mode": "default",
-      "dynamic": false,
-      "compile_transformer_blocks_only": true,
-      "dynamo_cache_size_limit": 64,
-      "model": [
-        "68",
-        0
-      ]
-    },
-    "class_type": "TorchCompileModelWanVideoV2",
-    "_meta": {
-      "title": "TorchCompileModelWanVideoV2"
-    }
-  },
   "101": {
     "inputs": {
       "sage_attention": "auto",
       "model": [
-        "100",
+        "68",
         0
       ]
     },
@@ -280,7 +262,7 @@
     "inputs": {
       "sage_attention": "auto",
       "model": [
-        "103",
+        "72",
         0
       ]
     },
@@ -289,22 +271,4 @@
       "title": "Patch Sage Attention KJ"
     }
   },
-  "103": {
-    "inputs": {
-      "backend": "inductor",
-      "fullgraph": false,
-      "mode": "default",
-      "dynamic": false,
-      "compile_transformer_blocks_only": true,
-      "dynamo_cache_size_limit": 64,
-      "model": [
-        "72",
-        0
-      ]
-    },
-    "class_type": "TorchCompileModelWanVideoV2",
-    "_meta": {
-      "title": "TorchCompileModelWanVideoV2"
-    }
-  }
 }
