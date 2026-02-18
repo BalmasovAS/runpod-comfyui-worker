@@ -421,6 +421,33 @@ def handler(job):
         print("🔍 Проверяю наличие custom nodes через object_info...")
         check_custom_nodes()
         
+        # Проверяем наличие необходимых узлов для workflow
+        print("🔍 Проверяю наличие необходимых узлов для workflow...")
+        try:
+            response = requests.get(f"{COMFYUI_URL}/object_info", timeout=10)
+            if response.status_code == 200:
+                object_info = response.json()
+                all_node_types = list(object_info.keys())
+                
+                # Проверяем узлы, которые используются в workflow
+                required_nodes = ["TorchCompileModelWanVideoV2", "PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo"]
+                missing_nodes = []
+                for node_type in required_nodes:
+                    if node_type not in all_node_types:
+                        missing_nodes.append(node_type)
+                
+                if missing_nodes:
+                    print(f"⚠️ Отсутствуют необходимые узлы: {missing_nodes}")
+                    print(f"   Доступные узлы (первые 100): {all_node_types[:100]}")
+                    return {
+                        "error": f"Отсутствуют необходимые custom nodes: {', '.join(missing_nodes)}. Убедитесь, что все custom nodes установлены и загружены."
+                    }
+                else:
+                    print(f"✅ Все необходимые узлы найдены: {required_nodes}")
+        except Exception as e:
+            print(f"⚠️ Ошибка проверки узлов: {e}")
+            # Продолжаем выполнение, так как это только предупреждение
+        
         # Получаем данные из запроса
         print(f"📥 Получен job: {json.dumps(job, indent=2)[:500]}")
         input_data = job.get("input", {})
