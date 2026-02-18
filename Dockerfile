@@ -102,9 +102,12 @@ WORKDIR /
 RUN uv pip install runpod requests websocket-client pyyaml
 
 # Add application code and scripts
-COPY handler.py workflows/ ./
+COPY handler.py ./
 COPY start.sh ./
 RUN chmod +x /start.sh
+
+# Copy workflows to ComfyUI directory
+COPY workflows/ /comfyui/workflows/
 
 # Copy helper script to switch Manager network mode at container start
 COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
