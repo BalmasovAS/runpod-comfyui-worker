@@ -105,9 +105,9 @@ COPY handler.py workflows/ ./
 COPY start.sh ./
 RUN chmod +x /start.sh
 
-# Add script to install custom nodes
-COPY scripts/comfy-node-install.sh /usr/local/bin/comfy-node-install
-RUN chmod +x /usr/local/bin/comfy-node-install
+# Copy helper script to switch Manager network mode at container start
+COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
+RUN chmod +x /usr/local/bin/comfy-manager-set-mode
 
 # Prevent pip from asking for confirmation during uninstall steps in custom nodes
 ENV PIP_NO_INPUT=1
@@ -115,22 +115,26 @@ ENV PIP_NO_INPUT=1
 # Change working directory to ComfyUI
 WORKDIR /comfyui
 
-# Install custom nodes via comfy-cli (fixed list for Wan Video)
+# Install custom nodes manually (more reliable than comfy-node-install)
 # These are the required custom nodes for this project
 RUN echo "Installing custom ComfyUI nodes..." && \
-    /usr/local/bin/comfy-node-install \
-        ComfyUI-WanVideoWrapper \
-        ComfyUI-KJNodes \
-        city96/ComfyUI-GGUF \
-        RES4LYF \
-    || (echo "Failed to install custom nodes" && exit 1)
+    cd /comfyui/custom_nodes && \
+    echo "Cloning ComfyUI-WanVideoWrapper..." && \
+    git clone https://github.com/kijai/ComfyUI-WanVideoWrapper.git && \
+    echo "Cloning ComfyUI-KJNodes..." && \
+    git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
+    echo "Cloning ComfyUI-GGUF..." && \
+    git clone https://github.com/city96/ComfyUI-GGUF.git && \
+    echo "Cloning RES4LYF..." && \
+    git clone https://github.com/ClownsharkBatwing/RES4LYF.git && \
+    echo "Installing GGUF dependencies..." && \
+    cd ComfyUI-GGUF && \
+    uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
+    cd .. && \
+    echo "✅ Custom nodes installed successfully"
 
 # Go back to the root
 WORKDIR /
-
-# Copy helper script to switch Manager network mode at container start
-COPY scripts/comfy-manager-set-mode.sh /usr/local/bin/comfy-manager-set-mode
-RUN chmod +x /usr/local/bin/comfy-manager-set-mode
 
 # Set the default command to run when starting the container
 CMD ["/start.sh"]
