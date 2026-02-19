@@ -440,6 +440,7 @@ def handler(job):
         
         workflow_type = input_data.get("workflow", "photo")  # photo, video, voice
         workflow_params = input_data.get("params", {})
+        input_images = input_data.get("images", [])  # Массив входных изображений для video workflow
         
         print(f"📋 Тип workflow: {workflow_type}")
         print(f"📋 Получены параметры: {list(workflow_params.keys())}")
