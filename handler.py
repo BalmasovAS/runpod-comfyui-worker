@@ -505,6 +505,68 @@ def handler(job):
                     noise_seed = node_data.get('inputs', {}).get('noise_seed', 'not found')
                     print(f"   Узел {first_node_id}: noise_seed={noise_seed}")
         
+        # Обрабатываем входные изображения для video workflow
+        if workflow_type == "video" and input_images:
+            print(f"📸 Обрабатываю {len(input_images)} входных изображений для video workflow...")
+            uploaded_filenames = []
+            
+            for idx, image_data in enumerate(input_images):
+                image_name = image_data.get("name", f"input_image_{idx}.png")
+                image_base64 = image_data.get("image", "")
+                
+                # Удаляем data URI prefix если есть
+                if image_base64.startswith("data:image"):
+                    image_base64 = image_base64.split(",")[1]
+                
+                # Декодируем base64
+                try:
+                    image_bytes = base64.b64decode(image_base64)
+                    print(f"✅ Изображение {idx + 1} декодировано, размер: {len(image_bytes)} байт")
+                    
+                    # Загружаем изображение в ComfyUI через /upload/image endpoint
+                    files = {
+                        'image': (image_name, image_bytes, 'image/png')
+                    }
+                    upload_response = requests.post(f"{COMFYUI_URL}/upload/image", files=files)
+                    
+                    if upload_response.status_code == 200:
+                        upload_result = upload_response.json()
+                        uploaded_filename = upload_result.get("name", image_name)
+                        uploaded_filenames.append(uploaded_filename)
+                        print(f"✅ Изображение {idx + 1} загружено: {uploaded_filename}")
+                    else:
+                        print(f"⚠️ Ошибка загрузки изображения {idx + 1}: {upload_response.status_code}")
+                        uploaded_filenames.append(image_name)  # Используем оригинальное имя
+                except Exception as e:
+                    print(f"⚠️ Ошибка обработки изображения {idx + 1}: {e}")
+                    uploaded_filenames.append(image_name)
+            
+            # Обновляем LoadImage узлы в workflow с загруженными именами файлов
+            if uploaded_filenames:
+                print(f"📝 Обновляю LoadImage узлы с именами файлов: {uploaded_filenames}")
+                if "nodes" in workflow_to_send:
+                    # Формат с nodes (как в video.json)
+                    for node in workflow_to_send["nodes"]:
+                        if node.get("type") == "LoadImage":
+                            if node.get("widgets_values") and len(node["widgets_values"]) > 0:
+                                node["widgets_values"][0] = uploaded_filenames[0]
+                                print(f"✅ LoadImage узел {node.get('id')} обновлен: {uploaded_filenames[0]}")
+                            else:
+                                # Если widgets_values нет, создаем его
+                                node["widgets_values"] = [uploaded_filenames[0], "image"]
+                                print(f"✅ LoadImage узел {node.get('id')} обновлен (создан widgets_values): {uploaded_filenames[0]}")
+                else:
+                    # Плоский формат (как в photo.json)
+                    for node_id, node_data in workflow_to_send.items():
+                        if isinstance(node_data, dict) and node_data.get("class_type") == "LoadImage":
+                            if "widgets_values" in node_data and len(node_data["widgets_values"]) > 0:
+                                node_data["widgets_values"][0] = uploaded_filenames[0]
+                                print(f"✅ LoadImage узел {node_id} обновлен: {uploaded_filenames[0]}")
+                            else:
+                                # Если widgets_values нет, создаем его
+                                node_data["widgets_values"] = [uploaded_filenames[0], "image"]
+                                print(f"✅ LoadImage узел {node_id} обновлен (создан widgets_values): {uploaded_filenames[0]}")
+        
         # Логируем первые 1000 символов workflow для отладки
         workflow_str = json.dumps(workflow_to_send)
         print(f"📋 Workflow для отправки (первые 1000 символов): {workflow_str[:1000]}")
