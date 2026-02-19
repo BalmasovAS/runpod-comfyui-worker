@@ -826,6 +826,9 @@ def handler(job):
         workflow_params = input_data.get("params", {})
         input_images = input_data.get("images", [])  # Массив входных изображений для video workflow
         
+        # Инициализируем uploaded_filenames заранее, чтобы она была доступна во всех ветках
+        uploaded_filenames = []
+        
         if input_images:
             print(f"📸 Получено {len(input_images)} входных изображений для обработки")
         
@@ -898,7 +901,7 @@ def handler(job):
         # Обрабатываем входные изображения для video workflow
         if workflow_type == "video" and input_images:
             print(f"📸 Обрабатываю {len(input_images)} входных изображений для video workflow...")
-            uploaded_filenames = []
+            # uploaded_filenames уже инициализирована выше
             
             for idx, image_data in enumerate(input_images):
                 image_name = image_data.get("name", f"input_image_{idx}.png")
