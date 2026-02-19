@@ -260,10 +260,25 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                 if input_name:
                     flat_node["inputs"][input_name] = [str(from_node_id), from_slot]
         
-        # Копируем существующие inputs (если есть прямые значения)
+        # Обрабатываем inputs узла - ищем связи через поле "link"
         if "inputs" in node and node["inputs"] is not None:
             node_inputs = node["inputs"]
-            if isinstance(node_inputs, dict):
+            if isinstance(node_inputs, list):
+                # Формат: [{"name": "images", "type": "IMAGE", "link": 182}, ...]
+                for input_def in node_inputs:
+                    if isinstance(input_def, dict):
+                        input_name = input_def.get("name")
+                        link_id = input_def.get("link")
+                        
+                        # Если есть link, находим связь по link_id
+                        if link_id is not None and link_id in link_id_to_connection:
+                            from_node_id, from_slot, to_node_id, to_slot = link_id_to_connection[link_id]
+                            if to_node_id == node_id_int:
+                                # Это связь к текущему узлу
+                                flat_node["inputs"][input_name] = [str(from_node_id), from_slot]
+                                print(f"🔗 Связь через link {link_id}: {input_name} = [{from_node_id}, {from_slot}]")
+            elif isinstance(node_inputs, dict):
+                # Формат: {"param": value} - прямые значения
                 for key, value in node_inputs.items():
                     # Не перезаписываем, если уже установлено из widgets_values или connections
                     if key not in flat_node["inputs"]:
