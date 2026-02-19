@@ -114,6 +114,8 @@ RUN echo "Installing custom ComfyUI nodes..." && \
     git clone https://github.com/kijai/ComfyUI-KJNodes.git && \
     cd ComfyUI-KJNodes && \
     uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
+    uv pip install sageattention || echo "sageattention installation failed, trying alternative..." && \
+    uv pip install git+https://github.com/tencent-ailab/sageattention.git || echo "sageattention from git failed" && \
     cd .. && \
     echo "Cloning ComfyUI-GGUF..." && \
     git clone https://github.com/city96/ComfyUI-GGUF.git && \
