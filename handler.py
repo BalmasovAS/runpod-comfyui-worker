@@ -6,6 +6,8 @@ import os
 import base64
 import sys
 
+# Handler version: 2025-02-17 - Added workflow conversion from nodes to flat format
+
 # Путь к ComfyUI (обновлен для нового Dockerfile)
 COMFYUI_DIR = "/comfyui"
 COMFYUI_PORT = 8188
