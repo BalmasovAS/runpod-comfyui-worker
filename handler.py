@@ -61,12 +61,25 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
     
     for node in nodes:
         node_id = node.get("id")
-        outputs = node.get("outputs", [])
+        outputs = node.get("outputs")
+        
+        # Проверяем, что outputs не None и является списком
+        if outputs is None:
+            outputs = []
+        if not isinstance(outputs, list):
+            outputs = []
         
         # Проходим по всем outputs узла
         for output_idx, output in enumerate(outputs):
             if isinstance(output, dict):
-                links = output.get("links", [])
+                links = output.get("links")
+                
+                # Проверяем, что links не None и является списком
+                if links is None:
+                    links = []
+                if not isinstance(links, list):
+                    links = []
+                
                 # links содержит ID связей или прямые ссылки на узлы
                 for link in links:
                     if isinstance(link, list) and len(link) >= 2:
@@ -90,8 +103,10 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
         }
         
         # Обрабатываем widgets_values - добавляем в inputs
-        if "widgets_values" in node and node["widgets_values"]:
+        if "widgets_values" in node and node["widgets_values"] is not None:
             widgets = node["widgets_values"]
+            if not isinstance(widgets, list):
+                widgets = []
             # Для LoadImage: widgets_values[0] = filename, widgets_values[1] = subfolder
             if node_type == "LoadImage" and len(widgets) >= 1:
                 flat_node["inputs"]["image"] = widgets[0]
@@ -187,11 +202,13 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                     flat_node["inputs"][input_name] = [str(from_node_id), from_slot]
         
         # Копируем существующие inputs (если есть прямые значения)
-        if "inputs" in node:
-            for key, value in node["inputs"].items():
-                # Не перезаписываем, если уже установлено из widgets_values или connections
-                if key not in flat_node["inputs"]:
-                    flat_node["inputs"][key] = value
+        if "inputs" in node and node["inputs"] is not None:
+            node_inputs = node["inputs"]
+            if isinstance(node_inputs, dict):
+                for key, value in node_inputs.items():
+                    # Не перезаписываем, если уже установлено из widgets_values или connections
+                    if key not in flat_node["inputs"]:
+                        flat_node["inputs"][key] = value
         
         # Копируем _meta если есть
         if "_meta" in node:
