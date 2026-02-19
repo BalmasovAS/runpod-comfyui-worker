@@ -394,6 +394,22 @@ def handler(job):
     ComfyUI должен быть уже запущен через start.sh скрипт
     """
     try:
+        # Проверяем тип job - может быть строкой JSON
+        if isinstance(job, str):
+            try:
+                job = json.loads(job)
+                print("✅ job был строкой, распарсен в dict")
+            except json.JSONDecodeError as e:
+                print(f"❌ Ошибка парсинга job как JSON строки: {e}")
+                return {
+                    "error": f"Неверный формат job (ожидается dict или JSON строка): {str(e)}"
+                }
+        
+        if not isinstance(job, dict):
+            return {
+                "error": f"Неверный тип job: ожидается dict, получен {type(job)}"
+            }
+        
         # Проверяем, что ComfyUI доступен
         if not check_comfyui_server():
             return {
@@ -434,13 +450,48 @@ def handler(job):
             # Продолжаем выполнение, так как это только предупреждение
         
         # Получаем данные из запроса
-        print(f"📥 Получен job: {json.dumps(job, indent=2)[:500]}")
+        try:
+            # Логируем job без изображений (они могут быть очень большими)
+            job_for_log = {}
+            if isinstance(job, dict):
+                job_for_log = job.copy()
+                if "input" in job_for_log and isinstance(job_for_log["input"], dict):
+                    input_copy = job_for_log["input"].copy()
+                    if "images" in input_copy:
+                        images_count = len(input_copy["images"]) if isinstance(input_copy["images"], list) else 0
+                        input_copy["images"] = f"[{images_count} изображений, скрыто для логов]"
+                    job_for_log["input"] = input_copy
+            print(f"📥 Получен job: {json.dumps(job_for_log, indent=2)[:1000]}")
+        except Exception as e:
+            print(f"⚠️ Ошибка логирования job: {e}")
+            print(f"📥 Получен job (тип: {type(job)})")
+        
         input_data = job.get("input", {})
-        print(f"📥 input_data: {json.dumps(input_data, indent=2)[:500]}")
+        
+        if not isinstance(input_data, dict):
+            return {
+                "error": f"Неверный тип input_data: ожидается dict, получен {type(input_data)}"
+            }
+        
+        # Логируем input_data без изображений
+        try:
+            input_data_for_log = {}
+            if isinstance(input_data, dict):
+                input_data_for_log = input_data.copy()
+                if "images" in input_data_for_log:
+                    images_count = len(input_data_for_log["images"]) if isinstance(input_data_for_log["images"], list) else 0
+                    input_data_for_log["images"] = f"[{images_count} изображений, скрыто для логов]"
+            print(f"📥 input_data: {json.dumps(input_data_for_log, indent=2)[:1000]}")
+        except Exception as e:
+            print(f"⚠️ Ошибка логирования input_data: {e}")
+            print(f"📥 input_data (тип: {type(input_data)})")
         
         workflow_type = input_data.get("workflow", "photo")  # photo, video, voice
         workflow_params = input_data.get("params", {})
         input_images = input_data.get("images", [])  # Массив входных изображений для video workflow
+        
+        if input_images:
+            print(f"📸 Получено {len(input_images)} входных изображений для обработки")
         
         print(f"📋 Тип workflow: {workflow_type}")
         print(f"📋 Получены параметры: {list(workflow_params.keys())}")
@@ -530,12 +581,31 @@ def handler(job):
                     upload_response = requests.post(f"{COMFYUI_URL}/upload/image", files=files)
                     
                     if upload_response.status_code == 200:
-                        upload_result = upload_response.json()
-                        uploaded_filename = upload_result.get("name", image_name)
-                        uploaded_filenames.append(uploaded_filename)
-                        print(f"✅ Изображение {idx + 1} загружено: {uploaded_filename}")
+                        try:
+                            # Проверяем, что ответ - это JSON
+                            content_type = upload_response.headers.get('content-type', '')
+                            if 'application/json' in content_type:
+                                upload_result = upload_response.json()
+                                uploaded_filename = upload_result.get("name", image_name)
+                                uploaded_filenames.append(uploaded_filename)
+                                print(f"✅ Изображение {idx + 1} загружено: {uploaded_filename}")
+                            else:
+                                # Если не JSON, пробуем извлечь имя файла из ответа
+                                response_text = upload_response.text
+                                print(f"⚠️ Ответ от /upload/image не JSON, content-type: {content_type}")
+                                print(f"   Ответ (первые 200 символов): {response_text[:200]}")
+                                # Используем оригинальное имя
+                                uploaded_filenames.append(image_name)
+                                print(f"✅ Использую оригинальное имя файла: {image_name}")
+                        except json.JSONDecodeError as e:
+                            print(f"⚠️ Ошибка парсинга JSON ответа от /upload/image: {e}")
+                            print(f"   Ответ (первые 200 символов): {upload_response.text[:200]}")
+                            # Используем оригинальное имя
+                            uploaded_filenames.append(image_name)
+                            print(f"✅ Использую оригинальное имя файла: {image_name}")
                     else:
                         print(f"⚠️ Ошибка загрузки изображения {idx + 1}: {upload_response.status_code}")
+                        print(f"   Ответ: {upload_response.text[:200]}")
                         uploaded_filenames.append(image_name)  # Используем оригинальное имя
                 except Exception as e:
                     print(f"⚠️ Ошибка обработки изображения {idx + 1}: {e}")
