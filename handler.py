@@ -923,31 +923,62 @@ def handler(job):
                     print(f"⚠️ Ошибка обработки изображения {idx + 1}: {e}")
                     uploaded_filenames.append(image_name)
             
-            # Обновляем LoadImage узлы в workflow с загруженными именами файлов
+        # Определяем формат workflow (с nodes или без)
+        if "nodes" in workflow_data:
+            # Работаем с форматом nodes
+            workflow_with_nodes = json.loads(json.dumps(workflow_data))  # Глубокая копия
+            
+            # Обновляем LoadImage узлы с загруженными именами файлов ПЕРЕД конвертацией
             if uploaded_filenames:
-                print(f"📝 Обновляю LoadImage узлы с именами файлов: {uploaded_filenames}")
-                if "nodes" in workflow_to_send:
-                    # Формат с nodes (как в video.json)
-                    for node in workflow_to_send["nodes"]:
-                        if node.get("type") == "LoadImage":
-                            if node.get("widgets_values") and len(node["widgets_values"]) > 0:
-                                node["widgets_values"][0] = uploaded_filenames[0]
-                                print(f"✅ LoadImage узел {node.get('id')} обновлен: {uploaded_filenames[0]}")
-                            else:
-                                # Если widgets_values нет, создаем его
-                                node["widgets_values"] = [uploaded_filenames[0], "image"]
-                                print(f"✅ LoadImage узел {node.get('id')} обновлен (создан widgets_values): {uploaded_filenames[0]}")
-                else:
-                    # Плоский формат (как в photo.json)
-                    for node_id, node_data in workflow_to_send.items():
-                        if isinstance(node_data, dict) and node_data.get("class_type") == "LoadImage":
-                            if "widgets_values" in node_data and len(node_data["widgets_values"]) > 0:
-                                node_data["widgets_values"][0] = uploaded_filenames[0]
-                                print(f"✅ LoadImage узел {node_id} обновлен: {uploaded_filenames[0]}")
-                            else:
-                                # Если widgets_values нет, создаем его
-                                node_data["widgets_values"] = [uploaded_filenames[0], "image"]
-                                print(f"✅ LoadImage узел {node_id} обновлен (создан widgets_values): {uploaded_filenames[0]}")
+                print(f"📝 Обновляю LoadImage узлы в nodes формате с именами файлов: {uploaded_filenames}")
+                for node in workflow_with_nodes["nodes"]:
+                    if node.get("type") == "LoadImage":
+                        if node.get("widgets_values") and len(node["widgets_values"]) > 0:
+                            node["widgets_values"][0] = uploaded_filenames[0]
+                            print(f"✅ LoadImage узел {node.get('id')} обновлен: {uploaded_filenames[0]}")
+                        else:
+                            # Если widgets_values нет, создаем его
+                            node["widgets_values"] = [uploaded_filenames[0], "image"]
+                            print(f"✅ LoadImage узел {node.get('id')} обновлен (создан widgets_values): {uploaded_filenames[0]}")
+            
+            # Применяем параметры напрямую к nodes
+            if workflow_type == "video":
+                apply_video_params_to_nodes(workflow_with_nodes["nodes"], workflow_params)
+            elif workflow_type == "voice":
+                apply_voice_params_to_nodes(workflow_with_nodes["nodes"], workflow_params)
+            else:
+                apply_photo_params_to_nodes(workflow_with_nodes["nodes"], workflow_params)
+            
+            # Конвертируем в плоский формат для ComfyUI API
+            print(f"🔄 Конвертирую workflow из формата с nodes в плоский формат...")
+            workflow_to_send = convert_nodes_to_flat_format(workflow_with_nodes)
+            print(f"📤 Отправляю workflow в ComfyUI (узлов: {len(workflow_to_send)})")
+        else:
+            # Плоский формат - работаем напрямую
+            workflow_to_send = json.loads(json.dumps(workflow_data))  # Глубокая копия
+            
+            # Обновляем LoadImage узлы с загруженными именами файлов
+            if uploaded_filenames:
+                print(f"📝 Обновляю LoadImage узлы в плоском формате с именами файлов: {uploaded_filenames}")
+                for node_id, node_data in workflow_to_send.items():
+                    if isinstance(node_data, dict) and node_data.get("class_type") == "LoadImage":
+                        if "widgets_values" in node_data and len(node_data["widgets_values"]) > 0:
+                            node_data["widgets_values"][0] = uploaded_filenames[0]
+                            print(f"✅ LoadImage узел {node_id} обновлен: {uploaded_filenames[0]}")
+                        else:
+                            # Если widgets_values нет, создаем его
+                            node_data["widgets_values"] = [uploaded_filenames[0], "image"]
+                            print(f"✅ LoadImage узел {node_id} обновлен (создан widgets_values): {uploaded_filenames[0]}")
+            
+            # Применяем параметры к workflow в зависимости от типа
+            if workflow_type == "video":
+                apply_video_params(workflow_to_send, workflow_params)
+            elif workflow_type == "voice":
+                apply_voice_params(workflow_to_send, workflow_params)
+            else:
+                apply_photo_params(workflow_to_send, workflow_params)
+            
+            print(f"📤 Отправляю workflow в ComfyUI (узлов: {len(workflow_to_send)})")
         
         # Логируем первые 1000 символов workflow для отладки
         workflow_str = json.dumps(workflow_to_send)
