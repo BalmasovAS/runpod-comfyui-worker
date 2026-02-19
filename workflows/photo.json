@@ -160,11 +160,12 @@
   },
   "67": {
     "inputs": {
-      "seed": 669817269655390
+      "seed": 669817269655390,
+      "noise_seed": 669817269655390
     },
-    "class_type": "Seed Generator",
+    "class_type": "RandomSeed",
     "_meta": {
-      "title": "Seed Generator"
+      "title": "Random Seed"
     }
   },
   "68": {
