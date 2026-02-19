@@ -135,11 +135,14 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
             widgets = node["widgets_values"]
             if not isinstance(widgets, list):
                 widgets = []
-            # Для LoadImage: widgets_values[0] = filename, widgets_values[1] = subfolder
+            # Для LoadImage: widgets_values[0] = filename, widgets_values[1] = subfolder (обычно "image" или "input")
             if node_type == "LoadImage" and len(widgets) >= 1:
                 flat_node["inputs"]["image"] = widgets[0]
                 if len(widgets) >= 2:
                     flat_node["inputs"]["upload"] = widgets[1]
+                else:
+                    # Если subfolder не указан, используем "input" по умолчанию (для загруженных изображений)
+                    flat_node["inputs"]["upload"] = "input"
             # Для CLIPTextEncode: widgets_values[0] = text
             elif node_type == "CLIPTextEncode" and len(widgets) >= 1:
                 flat_node["inputs"]["text"] = widgets[0]
