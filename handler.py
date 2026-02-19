@@ -248,8 +248,21 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
         
         # Обрабатываем связи из connections
         # Ищем все связи, которые ведут к этому узлу
+        # Пропускаем обработку через connections для узлов, которые имеют inputs с полем link
+        # (они будут обработаны позже через массив inputs)
+        has_inputs_with_links = False
+        if "inputs" in node and isinstance(node["inputs"], list):
+            for input_item in node["inputs"]:
+                if isinstance(input_item, dict) and input_item.get("link") is not None:
+                    has_inputs_with_links = True
+                    break
+        
         for (to_node_id, to_slot), (from_node_id, from_slot) in connections.items():
             if to_node_id == node_id_int:
+                # Пропускаем узлы, которые имеют inputs с полем link (они обрабатываются позже)
+                if has_inputs_with_links:
+                    continue
+                
                 # Эта связь ведет к текущему узлу
                 # Нужно определить имя входа по типу узла и slot
                 input_name = None
@@ -284,14 +297,25 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                     if to_slot == 0:
                         input_name = "model"
                 elif node_type == "WanImageToVideo":
-                    if to_slot == 0:
-                        input_name = "image"
-                    elif to_slot == 1:
-                        input_name = "clip"
-                    elif to_slot == 2:
-                        input_name = "model"
-                    elif to_slot == 3:
-                        input_name = "vae"
+                    # WanImageToVideo имеет входы: positive, negative, vae, clip_vision_output, start_image
+                    # Используем имя входа из inputs массива по индексу to_slot
+                    input_name = None
+                    if "inputs" in node and isinstance(node["inputs"], list) and to_slot < len(node["inputs"]):
+                        input_item = node["inputs"][to_slot]
+                        if isinstance(input_item, dict):
+                            input_name = input_item.get("name")
+                    # Fallback на маппинг по слотам, если имя не найдено
+                    if not input_name:
+                        if to_slot == 0:
+                            input_name = "positive"
+                        elif to_slot == 1:
+                            input_name = "negative"
+                        elif to_slot == 2:
+                            input_name = "vae"
+                        elif to_slot == 3:
+                            input_name = "clip_vision_output"
+                        elif to_slot == 4:
+                            input_name = "start_image"
                 elif node_type == "SaveVideo":
                     if to_slot == 0:
                         input_name = "video"
