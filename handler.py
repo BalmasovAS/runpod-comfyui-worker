@@ -1066,17 +1066,24 @@ def handler(job):
                 if status.get("completed"):
                     # Генерация завершена
                     outputs = history_data.get("outputs", {})
+                    print(f"📊 Получены outputs от ComfyUI, количество узлов: {len(outputs)}")
+                    print(f"📊 Ключи outputs: {list(outputs.keys())}")
+                    
                     files = []
                     
                     # Собираем все файлы (изображения, видео, аудио)
                     for node_id, node_output in outputs.items():
+                        print(f"🔍 Обрабатываю узел {node_id}, ключи: {list(node_output.keys())}")
+                        
                         # Изображения
                         if "images" in node_output:
+                            print(f"  📸 Найдены изображения в узле {node_id}: {len(node_output['images'])} шт.")
                             for image_info in node_output["images"]:
                                 filename = image_info["filename"]
                                 subfolder = image_info.get("subfolder", "")
                                 folder_type = image_info.get("type", "output")
                                 
+                                print(f"    📥 Загружаю изображение: {filename} (subfolder: {subfolder}, type: {folder_type})")
                                 file_data = get_image(filename, subfolder, folder_type)
                                 file_base64 = base64.b64encode(file_data).decode('utf-8')
                                 files.append({
@@ -1084,14 +1091,17 @@ def handler(job):
                                     "data": file_base64,
                                     "type": "image"
                                 })
+                                print(f"    ✅ Изображение добавлено, размер base64: {len(file_base64)} символов")
                         
                         # Видео
                         if "videos" in node_output:
+                            print(f"  🎬 Найдены видео в узле {node_id}: {len(node_output['videos'])} шт.")
                             for video_info in node_output["videos"]:
                                 filename = video_info["filename"]
                                 subfolder = video_info.get("subfolder", "")
                                 folder_type = video_info.get("type", "output")
                                 
+                                print(f"    📥 Загружаю видео: {filename} (subfolder: {subfolder}, type: {folder_type})")
                                 file_data = get_image(filename, subfolder, folder_type)
                                 file_base64 = base64.b64encode(file_data).decode('utf-8')
                                 files.append({
@@ -1099,14 +1109,17 @@ def handler(job):
                                     "data": file_base64,
                                     "type": "video"
                                 })
+                                print(f"    ✅ Видео добавлено, размер base64: {len(file_base64)} символов")
                         
                         # Аудио
                         if "audio" in node_output:
+                            print(f"  🎵 Найдено аудио в узле {node_id}")
                             audio_info = node_output["audio"]
                             filename = audio_info["filename"]
                             subfolder = audio_info.get("subfolder", "")
                             folder_type = audio_info.get("type", "output")
                             
+                            print(f"    📥 Загружаю аудио: {filename} (subfolder: {subfolder}, type: {folder_type})")
                             file_data = get_image(filename, subfolder, folder_type)
                             file_base64 = base64.b64encode(file_data).decode('utf-8')
                             files.append({
@@ -1114,14 +1127,21 @@ def handler(job):
                                 "data": file_base64,
                                 "type": "audio"
                             })
+                            print(f"    ✅ Аудио добавлено, размер base64: {len(file_base64)} символов")
                     
-                    print("✅ Генерация завершена успешно")
+                    print(f"✅ Генерация завершена успешно, собрано файлов: {len(files)}")
+                    if files:
+                        for idx, file_info in enumerate(files):
+                            print(f"  Файл {idx + 1}: {file_info['filename']}, тип: {file_info['type']}, размер base64: {len(file_info['data'])} символов")
+                    else:
+                        print("⚠️ ВНИМАНИЕ: Файлы не найдены в outputs!")
+                        print(f"📋 Полный outputs для отладки: {json.dumps(outputs, indent=2)[:2000]}")
                     
                     return {
                         "status": "completed",
                         "prompt_id": prompt_id,
                         "files": files,
-                        "images": files,
+                        "images": files,  # Для обратной совместимости
                         "outputs": outputs
                     }
                 
