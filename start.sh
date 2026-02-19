@@ -53,15 +53,18 @@ fi
 if [ -d "$RUNPOD_VOLUME_PATH/ComfyUI/models" ]; then
     echo "  📁 Found ComfyUI/models structure on Network Volume"
     # Link subdirectories from ComfyUI/models
-    for subdir in loras vae checkpoints clip controlnet upscale_models unet; do
+    for subdir in loras vae checkpoints clip controlnet upscale_models unet diffusion_models; do
         if [ -d "$RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir" ]; then
             # Map clip to text_encoders for ComfyUI
             if [ "$subdir" = "clip" ]; then
                 ln -sf "$RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir" /comfyui/models/text_encoders
                 echo "  ✅ Linked $subdir -> text_encoders: $RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir"
-            elif [ "$subdir" = "checkpoints" ]; then
-                ln -sf "$RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir" /comfyui/models/diffusion_models
-                echo "  ✅ Linked $subdir -> diffusion_models: $RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir"
+            elif [ "$subdir" = "checkpoints" ] || [ "$subdir" = "diffusion_models" ]; then
+                # Если diffusion_models уже существует, не перезаписываем
+                if [ ! -L /comfyui/models/diffusion_models ] || [ "$subdir" = "diffusion_models" ]; then
+                    ln -sf "$RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir" /comfyui/models/diffusion_models
+                    echo "  ✅ Linked $subdir -> diffusion_models: $RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir"
+                fi
             else
                 ln -sf "$RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir" /comfyui/models/$subdir
                 echo "  ✅ Linked $subdir: $RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir"

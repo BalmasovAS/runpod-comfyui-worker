@@ -25,3 +25,4 @@ a2:
   controlnet: controlnet
   upscale_models: upscale_models
   unet: unet
+  diffusion_models: diffusion_models
