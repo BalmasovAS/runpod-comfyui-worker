@@ -91,10 +91,18 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
     # Конвертируем nodes в плоский формат
     flat_workflow = {}
     
+    # Узлы, которые нужно пропустить (это не рабочие узлы, а UI элементы)
+    skip_node_types = ["Note", "Reroute", "PrimitiveNode"]
+    
     for node in nodes:
         node_id = str(node.get("id"))
         node_id_int = node.get("id")
         node_type = node.get("type", "")
+        
+        # Пропускаем узлы, которые не являются рабочими (Note, Reroute и т.д.)
+        if node_type in skip_node_types:
+            print(f"⏭️ Пропускаю узел {node_id} типа '{node_type}' (это UI элемент, не рабочий узел)")
+            continue
         
         # Создаем запись в плоском формате
         flat_node = {
