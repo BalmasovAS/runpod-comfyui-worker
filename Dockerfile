@@ -27,6 +27,7 @@ ENV CMAKE_BUILD_PARALLEL_LEVEL=8
 # Also install CUDA development libraries for Triton compilation
 RUN apt-get update && apt-get install -y \
     python3.12 \
+    python3.12-dev \
     python3.12-venv \
     git \
     wget \
