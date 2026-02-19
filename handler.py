@@ -28,6 +28,178 @@ except Exception as e:
 # Стандартный путь к Network Volume в RunPod
 RUNPOD_VOLUME_PATH = os.environ.get("RUNPOD_VOLUME_PATH", "/runpod-volume")
 
+def convert_nodes_to_flat_format(workflow_with_nodes):
+    """
+    Конвертирует workflow из формата с nodes в плоский формат для ComfyUI API
+    
+    Формат с nodes:
+    {
+      "nodes": [{"id": 1, "type": "...", "inputs": {...}, "outputs": [{"links": [link_id]}]}],
+      "links": [link_id] или связи в outputs
+    }
+    
+    Плоский формат:
+    {
+      "1": {"class_type": "...", "inputs": {"param": [from_node_id, from_slot]}}
+    }
+    """
+    if "nodes" not in workflow_with_nodes:
+        # Уже плоский формат
+        return workflow_with_nodes
+    
+    nodes = workflow_with_nodes.get("nodes", [])
+    
+    # Создаем словарь для быстрого доступа к узлам по ID
+    nodes_by_id = {node["id"]: node for node in nodes}
+    
+    # Строим карту связей из outputs узлов
+    # outputs содержит links - это ID связей, которые ведут к другим узлам
+    # Нужно найти, какие узлы подключены к каким входам
+    connections = {}  # {(to_node_id, to_slot): (from_node_id, from_slot)}
+    
+    for node in nodes:
+        node_id = node.get("id")
+        outputs = node.get("outputs", [])
+        
+        # Проходим по всем outputs узла
+        for output_idx, output in enumerate(outputs):
+            if isinstance(output, dict):
+                links = output.get("links", [])
+                # links содержит ID связей или прямые ссылки на узлы
+                for link in links:
+                    if isinstance(link, list) and len(link) >= 2:
+                        # Прямая ссылка [to_node_id, to_slot]
+                        to_node_id = link[0]
+                        to_slot = link[1] if len(link) > 1 else 0
+                        connections[(to_node_id, to_slot)] = (node_id, output_idx)
+    
+    # Конвертируем nodes в плоский формат
+    flat_workflow = {}
+    
+    for node in nodes:
+        node_id = str(node.get("id"))
+        node_id_int = node.get("id")
+        node_type = node.get("type", "")
+        
+        # Создаем запись в плоском формате
+        flat_node = {
+            "class_type": node_type,
+            "inputs": {}
+        }
+        
+        # Обрабатываем widgets_values - добавляем в inputs
+        if "widgets_values" in node and node["widgets_values"]:
+            widgets = node["widgets_values"]
+            # Для LoadImage: widgets_values[0] = filename, widgets_values[1] = subfolder
+            if node_type == "LoadImage" and len(widgets) >= 1:
+                flat_node["inputs"]["image"] = widgets[0]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["upload"] = widgets[1]
+            # Для CLIPTextEncode: widgets_values[0] = text
+            elif node_type == "CLIPTextEncode" and len(widgets) >= 1:
+                flat_node["inputs"]["text"] = widgets[0]
+            # Для VAELoader: widgets_values[0] = vae_name
+            elif node_type == "VAELoader" and len(widgets) >= 1:
+                flat_node["inputs"]["vae_name"] = widgets[0]
+            # Для CLIPLoader: widgets_values[0] = clip_name, widgets_values[1] = type, widgets_values[2] = device
+            elif node_type == "CLIPLoader" and len(widgets) >= 1:
+                flat_node["inputs"]["clip_name"] = widgets[0]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["type"] = widgets[1]
+                if len(widgets) >= 3:
+                    flat_node["inputs"]["device"] = widgets[2]
+            # Для UnetLoaderGGUF: widgets_values[0] = unet_name
+            elif node_type == "UnetLoaderGGUF" and len(widgets) >= 1:
+                flat_node["inputs"]["unet_name"] = widgets[0]
+            # Для LoraLoader: widgets_values[0] = lora_name, widgets_values[1] = strength_model, widgets_values[2] = strength_clip
+            elif node_type == "LoraLoader" and len(widgets) >= 1:
+                flat_node["inputs"]["lora_name"] = widgets[0]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["strength_model"] = widgets[1]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["strength_clip"] = widgets[2]
+            # Для LoraLoaderModelOnly: widgets_values[0] = lora_name, widgets_values[1] = strength_model
+            elif node_type == "LoraLoaderModelOnly" and len(widgets) >= 1:
+                flat_node["inputs"]["lora_name"] = widgets[0]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["strength_model"] = widgets[1]
+            # Для EmptyHunyuanLatentVideo: widgets_values[0] = width, widgets_values[1] = height, widgets_values[2] = length, widgets_values[3] = batch_size
+            elif node_type == "EmptyHunyuanLatentVideo":
+                if len(widgets) >= 1:
+                    flat_node["inputs"]["width"] = widgets[0]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["height"] = widgets[1]
+                if len(widgets) >= 3:
+                    flat_node["inputs"]["length"] = widgets[2]
+                if len(widgets) >= 4:
+                    flat_node["inputs"]["batch_size"] = widgets[3]
+        
+        # Обрабатываем связи из connections
+        # Ищем все связи, которые ведут к этому узлу
+        for (to_node_id, to_slot), (from_node_id, from_slot) in connections.items():
+            if to_node_id == node_id_int:
+                # Эта связь ведет к текущему узлу
+                # Нужно определить имя входа по типу узла и slot
+                input_name = None
+                
+                # Стандартные имена входов для разных типов узлов
+                if node_type == "KSamplerAdvanced":
+                    if to_slot == 0:
+                        input_name = "model"
+                    elif to_slot == 1:
+                        input_name = "positive"
+                    elif to_slot == 2:
+                        input_name = "negative"
+                    elif to_slot == 3:
+                        input_name = "latent_image"
+                elif node_type == "VAEDecode":
+                    if to_slot == 0:
+                        input_name = "samples"
+                    elif to_slot == 1:
+                        input_name = "vae"
+                elif node_type == "CLIPTextEncode":
+                    if to_slot == 0:
+                        input_name = "clip"
+                elif node_type == "LoraLoader":
+                    if to_slot == 0:
+                        input_name = "model"
+                    elif to_slot == 1:
+                        input_name = "clip"
+                elif node_type == "LoraLoaderModelOnly":
+                    if to_slot == 0:
+                        input_name = "model"
+                elif node_type == "PathchSageAttentionKJ":
+                    if to_slot == 0:
+                        input_name = "model"
+                elif node_type == "WanImageToVideo":
+                    if to_slot == 0:
+                        input_name = "image"
+                    elif to_slot == 1:
+                        input_name = "clip"
+                    elif to_slot == 2:
+                        input_name = "model"
+                    elif to_slot == 3:
+                        input_name = "vae"
+                
+                if input_name:
+                    flat_node["inputs"][input_name] = [str(from_node_id), from_slot]
+        
+        # Копируем существующие inputs (если есть прямые значения)
+        if "inputs" in node:
+            for key, value in node["inputs"].items():
+                # Не перезаписываем, если уже установлено из widgets_values или connections
+                if key not in flat_node["inputs"]:
+                    flat_node["inputs"][key] = value
+        
+        # Копируем _meta если есть
+        if "_meta" in node:
+            flat_node["_meta"] = node["_meta"]
+        
+        flat_workflow[node_id] = flat_node
+    
+    print(f"✅ Конвертировано {len(flat_workflow)} узлов из формата с nodes в плоский формат")
+    return flat_workflow
+
 def queue_prompt(prompt):
     """Отправляет промпт в очередь ComfyUI"""
     p = {"prompt": prompt}
@@ -509,18 +681,21 @@ def handler(job):
         
         # Определяем формат workflow (с nodes или без)
         if "nodes" in workflow_data:
-            # Работаем напрямую с nodes
-            workflow_to_send = json.loads(json.dumps(workflow_data))  # Глубокая копия
+            # Работаем с форматом nodes
+            workflow_with_nodes = json.loads(json.dumps(workflow_data))  # Глубокая копия
             
             # Применяем параметры напрямую к nodes
             if workflow_type == "video":
-                apply_video_params_to_nodes(workflow_to_send["nodes"], workflow_params)
+                apply_video_params_to_nodes(workflow_with_nodes["nodes"], workflow_params)
             elif workflow_type == "voice":
-                apply_voice_params_to_nodes(workflow_to_send["nodes"], workflow_params)
+                apply_voice_params_to_nodes(workflow_with_nodes["nodes"], workflow_params)
             else:
-                apply_photo_params_to_nodes(workflow_to_send["nodes"], workflow_params)
+                apply_photo_params_to_nodes(workflow_with_nodes["nodes"], workflow_params)
             
-            print(f"📤 Отправляю workflow в ComfyUI (узлов: {len(workflow_to_send['nodes'])})")
+            # Конвертируем в плоский формат для ComfyUI API
+            print(f"🔄 Конвертирую workflow из формата с nodes в плоский формат...")
+            workflow_to_send = convert_nodes_to_flat_format(workflow_with_nodes)
+            print(f"📤 Отправляю workflow в ComfyUI (узлов: {len(workflow_to_send)})")
         else:
             # Плоский формат - работаем напрямую
             workflow_to_send = json.loads(json.dumps(workflow_data))  # Глубокая копия

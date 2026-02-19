@@ -42,17 +42,12 @@ RUN apt-get update && apt-get install -y \
     && ln -sf /usr/bin/python3.12 /usr/bin/python \
     && ln -sf /usr/bin/pip3 /usr/bin/pip
 
-# Install CUDA development libraries for Triton compilation
-# Note: These may already be in the base image, but we ensure they're available
-RUN apt-get update && apt-get install -y \
-    cuda-cudart-dev-12-6 \
-    cuda-nvcc-12-6 \
-    || echo "CUDA dev packages may already be installed or not available in this base image"
-
-# Disable Triton JIT compilation to avoid runtime compilation errors
-# This will use pre-compiled kernels when available
+# Note: Triton compilation issues can be avoided by:
+# 1. Using pre-compiled PyTorch wheels (default with comfy-cli)
+# 2. Setting environment variables to disable JIT if needed
+# If Triton still tries to compile, we may need to add python3.12-dev and build-essential
+# For now, we rely on pre-compiled binaries from PyTorch
 ENV TRITON_DISABLE_LINE_INFO=1
-ENV TRITON_INTERPRET=0
 
 # Clean up to reduce image size
 RUN apt-get autoremove -y && apt-get clean -y && rm -rf /var/lib/apt/lists/*
