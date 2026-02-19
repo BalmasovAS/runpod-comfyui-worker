@@ -1075,23 +1075,32 @@ def handler(job):
                     for node_id, node_output in outputs.items():
                         print(f"🔍 Обрабатываю узел {node_id}, ключи: {list(node_output.keys())}")
                         
-                        # Изображения
+                        # Изображения (могут быть видео, если есть поле animated или расширение .mp4/.webm)
                         if "images" in node_output:
                             print(f"  📸 Найдены изображения в узле {node_id}: {len(node_output['images'])} шт.")
+                            # Проверяем, есть ли поле animated (указывает на видео)
+                            is_animated = node_output.get("animated", False)
+                            
                             for image_info in node_output["images"]:
                                 filename = image_info["filename"]
                                 subfolder = image_info.get("subfolder", "")
                                 folder_type = image_info.get("type", "output")
                                 
-                                print(f"    📥 Загружаю изображение: {filename} (subfolder: {subfolder}, type: {folder_type})")
+                                # Определяем тип файла по расширению или полю animated
+                                file_type = "image"
+                                if is_animated or filename.lower().endswith(('.mp4', '.webm', '.mov', '.avi', '.mkv')):
+                                    file_type = "video"
+                                    print(f"    🎬 Определено как видео (animated={is_animated}, расширение={filename.split('.')[-1]})")
+                                
+                                print(f"    📥 Загружаю файл: {filename} (subfolder: {subfolder}, type: {folder_type}, file_type: {file_type})")
                                 file_data = get_image(filename, subfolder, folder_type)
                                 file_base64 = base64.b64encode(file_data).decode('utf-8')
                                 files.append({
                                     "filename": filename,
                                     "data": file_base64,
-                                    "type": "image"
+                                    "type": file_type
                                 })
-                                print(f"    ✅ Изображение добавлено, размер base64: {len(file_base64)} символов")
+                                print(f"    ✅ Файл добавлен как {file_type}, размер base64: {len(file_base64)} символов")
                         
                         # Видео
                         if "videos" in node_output:
