@@ -58,6 +58,7 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
     # Строим карту связей из массива links
     # Формат links: [link_id, from_node_id, from_slot, to_node_id, to_slot, type]
     connections = {}  # {(to_node_id, to_slot): (from_node_id, from_slot)}
+    link_id_to_connection = {}  # {link_id: (from_node_id, from_slot, to_node_id, to_slot)}
     
     # Обрабатываем массив links
     for link in links:
@@ -71,7 +72,9 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
             
             if from_node_id is not None and to_node_id is not None:
                 connections[(to_node_id, to_slot)] = (from_node_id, from_slot)
-                print(f"🔗 Связь: узел {from_node_id}:{from_slot} -> узел {to_node_id}:{to_slot}")
+                if link_id is not None:
+                    link_id_to_connection[link_id] = (from_node_id, from_slot, to_node_id, to_slot)
+                print(f"🔗 Связь: узел {from_node_id}:{from_slot} -> узел {to_node_id}:{to_slot} (link_id: {link_id})")
     
     # Также обрабатываем связи из outputs узлов (для обратной совместимости)
     for node in nodes:
@@ -183,6 +186,23 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                     flat_node["inputs"]["codec"] = widgets[1]
                 if len(widgets) >= 3:
                     flat_node["inputs"]["format"] = widgets[2]
+            # Для CreateVideo: widgets_values[0] = fps
+            elif node_type == "CreateVideo":
+                if len(widgets) >= 1:
+                    fps_value = widgets[0]
+                    # Конвертируем в int если нужно
+                    if isinstance(fps_value, str) and fps_value.isdigit():
+                        fps_value = int(fps_value)
+                    flat_node["inputs"]["fps"] = fps_value
+            # Для CreateVideo: widgets_values[0] = fps (может быть)
+            elif node_type == "CreateVideo":
+                # fps может быть в widgets_values или в inputs
+                if len(widgets) >= 1:
+                    # Пробуем определить, что это - fps или другое значение
+                    if isinstance(widgets[0], (int, float)):
+                        flat_node["inputs"]["fps"] = widgets[0]
+                    elif isinstance(widgets[0], str) and widgets[0].isdigit():
+                        flat_node["inputs"]["fps"] = int(widgets[0])
         
         # Обрабатываем связи из connections
         # Ищем все связи, которые ведут к этому узлу
