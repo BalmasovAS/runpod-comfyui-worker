@@ -158,6 +158,14 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                     flat_node["inputs"]["length"] = widgets[2]
                 if len(widgets) >= 4:
                     flat_node["inputs"]["batch_size"] = widgets[3]
+            # Для SaveVideo: widgets_values[0] = filename_prefix, widgets_values[1] = codec, widgets_values[2] = format
+            elif node_type == "SaveVideo":
+                if len(widgets) >= 1:
+                    flat_node["inputs"]["filename_prefix"] = widgets[0]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["codec"] = widgets[1]
+                if len(widgets) >= 3:
+                    flat_node["inputs"]["format"] = widgets[2]
         
         # Обрабатываем связи из connections
         # Ищем все связи, которые ведут к этому узлу
@@ -205,6 +213,12 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                         input_name = "model"
                     elif to_slot == 3:
                         input_name = "vae"
+                elif node_type == "SaveVideo":
+                    if to_slot == 0:
+                        input_name = "video"
+                    elif to_slot == 1:
+                        input_name = "filename_prefix"
+                    # codec и format обычно задаются через widgets_values
                 
                 if input_name:
                     flat_node["inputs"][input_name] = [str(from_node_id), from_slot]
