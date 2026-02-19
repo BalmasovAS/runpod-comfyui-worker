@@ -50,15 +50,30 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
         return workflow_with_nodes
     
     nodes = workflow_with_nodes.get("nodes", [])
+    links = workflow_with_nodes.get("links", [])
     
     # Создаем словарь для быстрого доступа к узлам по ID
     nodes_by_id = {node["id"]: node for node in nodes}
     
-    # Строим карту связей из outputs узлов
-    # outputs содержит links - это ID связей, которые ведут к другим узлам
-    # Нужно найти, какие узлы подключены к каким входам
+    # Строим карту связей из массива links
+    # Формат links: [link_id, from_node_id, from_slot, to_node_id, to_slot, type]
     connections = {}  # {(to_node_id, to_slot): (from_node_id, from_slot)}
     
+    # Обрабатываем массив links
+    for link in links:
+        if isinstance(link, list) and len(link) >= 5:
+            # Формат: [link_id, from_node_id, from_slot, to_node_id, to_slot, type]
+            link_id = link[0] if len(link) > 0 else None
+            from_node_id = link[1] if len(link) > 1 else None
+            from_slot = link[2] if len(link) > 2 else 0
+            to_node_id = link[3] if len(link) > 3 else None
+            to_slot = link[4] if len(link) > 4 else 0
+            
+            if from_node_id is not None and to_node_id is not None:
+                connections[(to_node_id, to_slot)] = (from_node_id, from_slot)
+                print(f"🔗 Связь: узел {from_node_id}:{from_slot} -> узел {to_node_id}:{to_slot}")
+    
+    # Также обрабатываем связи из outputs узлов (для обратной совместимости)
     for node in nodes:
         node_id = node.get("id")
         outputs = node.get("outputs")
@@ -72,21 +87,23 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
         # Проходим по всем outputs узла
         for output_idx, output in enumerate(outputs):
             if isinstance(output, dict):
-                links = output.get("links")
+                output_links = output.get("links")
                 
                 # Проверяем, что links не None и является списком
-                if links is None:
-                    links = []
-                if not isinstance(links, list):
-                    links = []
+                if output_links is None:
+                    output_links = []
+                if not isinstance(output_links, list):
+                    output_links = []
                 
                 # links содержит ID связей или прямые ссылки на узлы
-                for link in links:
+                for link in output_links:
                     if isinstance(link, list) and len(link) >= 2:
                         # Прямая ссылка [to_node_id, to_slot]
                         to_node_id = link[0]
                         to_slot = link[1] if len(link) > 1 else 0
-                        connections[(to_node_id, to_slot)] = (node_id, output_idx)
+                        # Используем только если связь еще не установлена из массива links
+                        if (to_node_id, to_slot) not in connections:
+                            connections[(to_node_id, to_slot)] = (node_id, output_idx)
     
     # Конвертируем nodes в плоский формат
     flat_workflow = {}
