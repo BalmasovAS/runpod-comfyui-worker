@@ -201,28 +201,13 @@ def apply_photo_params(workflow, params):
         seed_value = int(params["seed"])
         seed_updated = False
         
-        # Сначала ищем узел RandomSeed и обновляем его
-        for node_id, node_data in workflow.items():
-            if isinstance(node_data, dict) and node_data.get("class_type") == "RandomSeed":
-                if "inputs" in node_data:
-                    if "seed" in node_data["inputs"]:
-                        workflow[node_id]["inputs"]["seed"] = seed_value
-                        print(f"✅ Seed обновлен в узле RandomSeed '{node_id}': {seed_value}")
-                        seed_updated = True
-                    if "noise_seed" in node_data["inputs"]:
-                        workflow[node_id]["inputs"]["noise_seed"] = seed_value
-                        print(f"✅ Noise seed обновлен в узле RandomSeed '{node_id}': {seed_value}")
-        
-        # Также обновляем noise_seed в KSamplerAdvanced узлах
+        # Обновляем noise_seed в KSamplerAdvanced узлах (теперь это прямое значение, не ссылка)
         for node_id, node_data in workflow.items():
             if isinstance(node_data, dict) and node_data.get("class_type") == "KSamplerAdvanced":
                 if "inputs" in node_data and "noise_seed" in node_data["inputs"]:
-                    # Если noise_seed - это ссылка на узел, не меняем, иначе обновляем значение
-                    noise_seed_input = node_data["inputs"]["noise_seed"]
-                    if isinstance(noise_seed_input, (int, float)):
-                        workflow[node_id]["inputs"]["noise_seed"] = seed_value
-                        print(f"✅ Noise seed обновлен в узле KSamplerAdvanced '{node_id}': {seed_value}")
-                        seed_updated = True
+                    workflow[node_id]["inputs"]["noise_seed"] = seed_value
+                    print(f"✅ Noise seed обновлен в узле KSamplerAdvanced '{node_id}': {seed_value}")
+                    seed_updated = True
         
         if not seed_updated:
             print(f"⚠️ Не удалось найти узел для обновления seed")
