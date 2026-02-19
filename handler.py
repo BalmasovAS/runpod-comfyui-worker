@@ -194,15 +194,54 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                     if isinstance(fps_value, str) and fps_value.isdigit():
                         fps_value = int(fps_value)
                     flat_node["inputs"]["fps"] = fps_value
-            # Для CreateVideo: widgets_values[0] = fps (может быть)
-            elif node_type == "CreateVideo":
-                # fps может быть в widgets_values или в inputs
+            # Для WanImageToVideo: widgets_values содержат width, height, length, batch_size
+            elif node_type == "WanImageToVideo":
+                # Порядок: [width, height, length, batch_size]
                 if len(widgets) >= 1:
-                    # Пробуем определить, что это - fps или другое значение
-                    if isinstance(widgets[0], (int, float)):
-                        flat_node["inputs"]["fps"] = widgets[0]
-                    elif isinstance(widgets[0], str) and widgets[0].isdigit():
-                        flat_node["inputs"]["fps"] = int(widgets[0])
+                    flat_node["inputs"]["width"] = widgets[0]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["height"] = widgets[1]
+                if len(widgets) >= 3:
+                    flat_node["inputs"]["length"] = widgets[2]
+                if len(widgets) >= 4:
+                    flat_node["inputs"]["batch_size"] = widgets[3]
+            # Для KSamplerAdvanced: widgets_values содержат параметры в определенном порядке
+            elif node_type == "KSamplerAdvanced":
+                # Порядок: [add_noise, seed, randomize, steps, cfg, sampler_name, scheduler, start_at_step, end_at_step, return_with_leftover_noise]
+                if len(widgets) >= 1:
+                    flat_node["inputs"]["add_noise"] = widgets[0]
+                if len(widgets) >= 2:
+                    # seed может быть числом или "randomize"
+                    seed_value = widgets[1]
+                    if isinstance(seed_value, str) and seed_value.lower() == "randomize":
+                        # Используем случайное значение или оставляем как есть
+                        import random
+                        seed_value = random.randint(0, 2**32 - 1)
+                    flat_node["inputs"]["noise_seed"] = seed_value
+                if len(widgets) >= 4:
+                    flat_node["inputs"]["steps"] = widgets[3]
+                if len(widgets) >= 5:
+                    flat_node["inputs"]["cfg"] = widgets[4]
+                if len(widgets) >= 6:
+                    flat_node["inputs"]["sampler_name"] = widgets[5]
+                if len(widgets) >= 7:
+                    flat_node["inputs"]["scheduler"] = widgets[6]
+                if len(widgets) >= 8:
+                    flat_node["inputs"]["start_at_step"] = widgets[7]
+                if len(widgets) >= 9:
+                    flat_node["inputs"]["end_at_step"] = widgets[8]
+                if len(widgets) >= 10:
+                    flat_node["inputs"]["return_with_leftover_noise"] = widgets[9]
+            # Для UNETLoader: widgets_values[0] = unet_name, widgets_values[1] = weight_dtype
+            elif node_type == "UNETLoader":
+                if len(widgets) >= 1:
+                    flat_node["inputs"]["unet_name"] = widgets[0]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["weight_dtype"] = widgets[1]
+            # Для ModelSamplingSD3: widgets_values[0] = shift
+            elif node_type == "ModelSamplingSD3":
+                if len(widgets) >= 1:
+                    flat_node["inputs"]["shift"] = widgets[0]
         
         # Обрабатываем связи из connections
         # Ищем все связи, которые ведут к этому узлу
@@ -277,6 +316,11 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                                 # Это связь к текущему узлу
                                 flat_node["inputs"][input_name] = [str(from_node_id), from_slot]
                                 print(f"🔗 Связь через link {link_id}: {input_name} = [{from_node_id}, {from_slot}]")
+                        # Если нет link, но есть значение в input_def, копируем его
+                        elif "value" in input_def:
+                            if input_name not in flat_node["inputs"]:
+                                flat_node["inputs"][input_name] = input_def["value"]
+                                print(f"📝 Прямое значение для {input_name}: {input_def['value']}")
             elif isinstance(node_inputs, dict):
                 # Формат: {"param": value} - прямые значения
                 for key, value in node_inputs.items():
