@@ -1042,8 +1042,8 @@ def handler(job):
                     calculated_tokens = max(256, min(512, int(text_length / 4 * 1.5)))
                     print(f"📊 Длина текста: {text_length} символов, вычислен max_new_tokens: {calculated_tokens}")
                     
-                    # Фиксированный seed для стабильного голоса
-                    fixed_seed = 42  # Всегда один и тот же голос
+                    # Используем seed из параметров, если передан, иначе значение по умолчанию
+                    fixed_seed = workflow_params.get("voice_seed", 42)  # По умолчанию 42 для стабильного голоса
                     
                     # Ищем все узлы AILab_Qwen3TTSVoiceDesign_Advanced и передаем текст напрямую
                     for node_id, node_data in workflow_to_send.items():
@@ -1075,10 +1075,15 @@ def handler(job):
                                     node_data["inputs"]["max_new_tokens"] = calculated_tokens
                                     print(f"✅ max_new_tokens обновлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {calculated_tokens}")
                                 
-                                # Фиксируем seed для стабильного голоса
+                                # Устанавливаем seed для стабильного голоса
                                 if "seed" in inputs:
-                                    node_data["inputs"]["seed"] = fixed_seed
-                                    print(f"✅ Seed зафиксирован в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {fixed_seed}")
+                                    # Если seed был "randomize", заменяем на значение из параметров
+                                    current_seed = inputs.get("seed")
+                                    if isinstance(current_seed, str) and current_seed.lower() == "randomize":
+                                        node_data["inputs"]["seed"] = fixed_seed
+                                    else:
+                                        node_data["inputs"]["seed"] = fixed_seed
+                                    print(f"✅ Seed установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {fixed_seed}")
                             else:
                                 # Для других узлов проверяем связи на PrimitiveNode
                                 inputs = node_data.get("inputs", {})
@@ -1241,8 +1246,8 @@ def handler(job):
                     calculated_tokens = max(256, min(512, int(text_length / 4 * 1.5)))
                     print(f"📊 Длина текста: {text_length} символов, вычислен max_new_tokens: {calculated_tokens}")
                     
-                    # Фиксированный seed для стабильного голоса
-                    fixed_seed = 42  # Всегда один и тот же голос
+                    # Используем seed из параметров, если передан, иначе значение по умолчанию
+                    fixed_seed = workflow_params.get("voice_seed", 42)  # По умолчанию 42 для стабильного голоса
                     
                     # Ищем все узлы AILab_Qwen3TTSVoiceDesign_Advanced и передаем текст напрямую
                     for node_id, node_data in workflow_to_send.items():
@@ -1274,10 +1279,15 @@ def handler(job):
                                     node_data["inputs"]["max_new_tokens"] = calculated_tokens
                                     print(f"✅ max_new_tokens обновлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {calculated_tokens}")
                                 
-                                # Фиксируем seed для стабильного голоса
+                                # Устанавливаем seed для стабильного голоса
                                 if "seed" in inputs:
-                                    node_data["inputs"]["seed"] = fixed_seed
-                                    print(f"✅ Seed зафиксирован в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {fixed_seed}")
+                                    # Если seed был "randomize", заменяем на значение из параметров
+                                    current_seed = inputs.get("seed")
+                                    if isinstance(current_seed, str) and current_seed.lower() == "randomize":
+                                        node_data["inputs"]["seed"] = fixed_seed
+                                    else:
+                                        node_data["inputs"]["seed"] = fixed_seed
+                                    print(f"✅ Seed установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {fixed_seed}")
                             else:
                                 # Для других узлов проверяем связи на PrimitiveNode
                                 inputs = node_data.get("inputs", {})
