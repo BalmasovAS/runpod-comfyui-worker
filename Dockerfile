@@ -143,6 +143,8 @@ RUN echo "Installing custom ComfyUI nodes..." && \
     git clone https://github.com/1038lab/ComfyUI-QwenTTS.git && \
     cd ComfyUI-QwenTTS && \
     uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
+    # Устанавливаем совместимые версии transformers согласно README репозитория
+    uv pip install "transformers==4.57.3" "tokenizers<0.20" || echo "Transformers version installation failed" && \
     cd .. && \
     echo "✅ Custom nodes installed successfully"
 
