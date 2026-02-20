@@ -140,7 +140,7 @@ RUN echo "Installing custom ComfyUI nodes..." && \
     uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
     cd .. && \
     echo "Cloning ComfyUI-QwenTTS..." && \
-    git clone https://github.com/AILab-CVC/ComfyUI-QwenTTS.git && \
+    git clone https://github.com/1038lab/ComfyUI-QwenTTS.git && \
     cd ComfyUI-QwenTTS && \
     uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
     cd .. && \

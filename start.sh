@@ -83,9 +83,19 @@ echo "worker-comfyui: Starting ComfyUI"
 echo "worker-comfyui: Checking installed custom nodes..."
 if [ -d "/comfyui/custom_nodes/ComfyUI-QwenTTS" ]; then
     echo "  ✅ ComfyUI-QwenTTS найден"
+    echo "  📁 Содержимое папки:"
     ls -la /comfyui/custom_nodes/ComfyUI-QwenTTS/ | head -10
+    echo "  📄 Python файлы в папке:"
+    find /comfyui/custom_nodes/ComfyUI-QwenTTS -name "*.py" | head -5
+    if [ -f "/comfyui/custom_nodes/ComfyUI-QwenTTS/requirements.txt" ]; then
+        echo "  ✅ requirements.txt найден"
+    else
+        echo "  ⚠️ requirements.txt НЕ найден"
+    fi
 else
     echo "  ⚠️ ComfyUI-QwenTTS НЕ найден в /comfyui/custom_nodes/"
+    echo "  📁 Доступные custom nodes:"
+    ls -la /comfyui/custom_nodes/ | head -10
 fi
 
 # Allow operators to tweak verbosity; default is DEBUG.
@@ -133,6 +143,26 @@ if [ "$SERVE_API_LOCALLY" == "true" ]; then
     # Wait for ComfyUI to be ready
     if ! wait_for_comfyui $COMFYUI_PID; then
         exit 1
+    fi
+    
+    # Проверяем наличие QwenTTS нод после запуска ComfyUI
+    echo "worker-comfyui: Checking QwenTTS nodes availability..."
+    sleep 5  # Даем время на загрузку нод
+    if curl -s http://127.0.0.1:8188/object_info > /tmp/object_info.json 2>/dev/null; then
+        if grep -q "AILab_Qwen3TTSVoiceInstruct" /tmp/object_info.json; then
+            echo "  ✅ AILab_Qwen3TTSVoiceInstruct найден в object_info"
+        else
+            echo "  ⚠️ AILab_Qwen3TTSVoiceInstruct НЕ найден в object_info"
+            echo "  🔍 Ищем похожие ноды:"
+            grep -i "qwen\|tts\|voice" /tmp/object_info.json | head -5 || echo "    Нет похожих нод"
+        fi
+        if grep -q "AILab_Qwen3TTSVoiceDesign_Advanced" /tmp/object_info.json; then
+            echo "  ✅ AILab_Qwen3TTSVoiceDesign_Advanced найден в object_info"
+        else
+            echo "  ⚠️ AILab_Qwen3TTSVoiceDesign_Advanced НЕ найден в object_info"
+        fi
+    else
+        echo "  ⚠️ Не удалось получить object_info от ComfyUI"
     fi
     
     echo "worker-comfyui: Starting RunPod Handler"
