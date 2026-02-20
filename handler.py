@@ -876,6 +876,46 @@ def handler(job):
         print(f"📋 Получены параметры: {list(workflow_params.keys())}")
         print(f"📋 Значения параметров: {workflow_params}")
         
+        # Проверяем наличие необходимых узлов для конкретного типа workflow
+        print(f"🔍 Проверяю наличие необходимых узлов для {workflow_type} workflow...")
+        try:
+            response = requests.get(f"{COMFYUI_URL}/object_info", timeout=10)
+            if response.status_code == 200:
+                object_info = response.json()
+                all_node_types = list(object_info.keys())
+                
+                # Определяем необходимые узлы в зависимости от типа workflow
+                required_nodes = []
+                
+                if workflow_type == "video":
+                    required_nodes = ["PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo", "WanImageToVideo"]
+                elif workflow_type == "voice":
+                    required_nodes = ["AILab_Qwen3TTSVoiceInstruct", "AILab_Qwen3TTSVoiceDesign_Advanced", "SaveAudio", "PreviewAudio"]
+                else:  # photo
+                    required_nodes = ["PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo"]
+                
+                missing_nodes = []
+                for node_type in required_nodes:
+                    if node_type not in all_node_types:
+                        missing_nodes.append(node_type)
+                
+                if missing_nodes:
+                    print(f"⚠️ Отсутствуют необходимые узлы для {workflow_type} workflow: {missing_nodes}")
+                    print(f"   Доступные узлы (первые 100): {all_node_types[:100]}")
+                    # Ищем похожие названия для QwenTTS
+                    if workflow_type == "voice":
+                        qwen_nodes = [t for t in all_node_types if "qwen" in t.lower() or "tts" in t.lower() or "voice" in t.lower()]
+                        if qwen_nodes:
+                            print(f"   Найдены похожие узлы (QwenTTS): {qwen_nodes}")
+                    return {
+                        "error": f"Отсутствуют необходимые custom nodes для {workflow_type} workflow: {', '.join(missing_nodes)}. Убедитесь, что все custom nodes установлены и загружены. ComfyUI-QwenTTS должен быть установлен для voice workflow. Пересоберите Docker образ с обновленным Dockerfile."
+                    }
+                else:
+                    print(f"✅ Все необходимые узлы для {workflow_type} workflow найдены: {required_nodes}")
+        except Exception as e:
+            print(f"⚠️ Ошибка проверки узлов: {e}")
+            # Продолжаем выполнение, так как это только предупреждение
+        
         # Загружаем workflow
         workflow_path = f"{COMFYUI_DIR}/workflows/{workflow_type}.json"
         if not os.path.exists(workflow_path):
