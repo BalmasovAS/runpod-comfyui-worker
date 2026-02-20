@@ -145,6 +145,11 @@ RUN echo "Installing custom ComfyUI nodes..." && \
     uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
     # Устанавливаем совместимые версии transformers согласно README репозитория
     uv pip install "transformers==4.57.3" "tokenizers<0.20" || echo "Transformers version installation failed" && \
+    # Устанавливаем qwen-tts пакет (основная зависимость для Qwen3-TTS)
+    (uv pip install qwen-tts || \
+     uv pip install git+https://github.com/QwenLM/Qwen3-TTS.git || \
+     uv pip install qwen-tts[all] || \
+     echo "⚠️ qwen-tts installation failed, voice generation may not work") && \
     cd .. && \
     echo "Cloning ComfyUI-Crystools (для PrimitiveNode)..." && \
     git clone https://github.com/crystian/ComfyUI-Crystools.git || echo "ComfyUI-Crystools clone failed" && \
