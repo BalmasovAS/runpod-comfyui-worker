@@ -79,6 +79,15 @@ ls -la /comfyui/models/ | head -20
 
 echo "worker-comfyui: Starting ComfyUI"
 
+# Проверяем наличие установленных custom nodes
+echo "worker-comfyui: Checking installed custom nodes..."
+if [ -d "/comfyui/custom_nodes/ComfyUI-QwenTTS" ]; then
+    echo "  ✅ ComfyUI-QwenTTS найден"
+    ls -la /comfyui/custom_nodes/ComfyUI-QwenTTS/ | head -10
+else
+    echo "  ⚠️ ComfyUI-QwenTTS НЕ найден в /comfyui/custom_nodes/"
+fi
+
 # Allow operators to tweak verbosity; default is DEBUG.
 : "${COMFY_LOG_LEVEL:=DEBUG}"
 
