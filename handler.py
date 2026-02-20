@@ -779,22 +779,43 @@ def apply_voice_params_to_nodes(nodes, params):
                     print(f"✅ Seed установлен в узле '{node.get('id')}': {fixed_seed}")
                 break
     
-    # Обновляем temperature для AILab_Qwen3TTSVoiceDesign_Advanced
-    if "voice_temperature" in params:
-        voice_temp = params.get("voice_temperature")
-        for node in nodes:
-            if node.get("type") == "AILab_Qwen3TTSVoiceDesign_Advanced":
-                widgets = node.get("widgets_values", [])
-                # widgets_values[8] = temperature (индекс 8 согласно порядку в workflow)
-                if len(widgets) >= 9:
-                    widgets[8] = voice_temp
-                    node["widgets_values"] = widgets
-                    print(f"✅ Temperature обновлена в узле '{node.get('id')}': {voice_temp}")
-                break
+    # Обновляем temperature, top_p, top_k, repetition_penalty для AILab_Qwen3TTSVoiceDesign_Advanced
+    for node in nodes:
+        if node.get("type") == "AILab_Qwen3TTSVoiceDesign_Advanced":
+            widgets = node.get("widgets_values", [])
+            updated = False
+            
+            # widgets_values[8] = temperature (индекс 8 согласно порядку в workflow)
+            if "voice_temperature" in params and len(widgets) >= 9:
+                widgets[8] = params.get("voice_temperature")
+                updated = True
+                print(f"✅ Temperature обновлена в узле '{node.get('id')}': {params.get('voice_temperature')}")
+            
+            # widgets_values[9] = top_p (индекс 9 согласно порядку в workflow)
+            if "voice_top_p" in params and len(widgets) >= 10:
+                widgets[9] = params.get("voice_top_p")
+                updated = True
+                print(f"✅ Top-p обновлен в узле '{node.get('id')}': {params.get('voice_top_p')}")
+            
+            # widgets_values[10] = top_k (индекс 10 согласно порядку в workflow)
+            if "voice_top_k" in params and len(widgets) >= 11:
+                widgets[10] = params.get("voice_top_k")
+                updated = True
+                print(f"✅ Top-k обновлен в узле '{node.get('id')}': {params.get('voice_top_k')}")
+            
+            # widgets_values[11] = repetition_penalty (индекс 11 согласно порядку в workflow)
+            if "voice_repetition_penalty" in params and len(widgets) >= 12:
+                widgets[11] = params.get("voice_repetition_penalty")
+                updated = True
+                print(f"✅ Repetition penalty обновлен в узле '{node.get('id')}': {params.get('voice_repetition_penalty')}")
+            
+            if updated:
+                node["widgets_values"] = widgets
+            break
     
     # Обновляем другие параметры универсально
     for param_key, param_value in params.items():
-        if param_key in ["prompt", "text", "voice_gender", "voice_style", "voice_description", "voice_seed", "voice_temperature"]:
+        if param_key in ["prompt", "text", "voice_gender", "voice_style", "voice_description", "voice_seed", "voice_temperature", "voice_top_p", "voice_top_k", "voice_repetition_penalty"]:
             continue  # Уже обработали
         # Ищем узлы с этим параметром в inputs или widgets_values
         for node in nodes:
