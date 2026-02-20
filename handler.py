@@ -112,7 +112,8 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
     flat_workflow = {}
     
     # Узлы, которые нужно пропустить (это не рабочие узлы, а UI элементы)
-    skip_node_types = ["Note", "MarkdownNote", "Reroute", "PrimitiveNode", "ShowText", "ShowImage"]
+    # PrimitiveNode НЕ пропускаем, так как он используется для ввода текста в voice workflow
+    skip_node_types = ["Note", "MarkdownNote", "Reroute", "ShowText", "ShowImage", "PreviewAny"]
     
     for node in nodes:
         node_id = str(node.get("id"))
@@ -120,6 +121,7 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
         node_type = node.get("type", "")
         
         # Пропускаем узлы, которые не являются рабочими (Note, Reroute и т.д.)
+        # НО НЕ пропускаем PrimitiveNode, так как он используется для ввода текста
         if node_type in skip_node_types:
             print(f"⏭️ Пропускаю узел {node_id} типа '{node_type}' (это UI элемент, не рабочий узел)")
             continue
@@ -208,6 +210,40 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                     flat_node["inputs"]["length"] = widgets[2]
                 if len(widgets) >= 4:
                     flat_node["inputs"]["batch_size"] = widgets[3]
+            # Для PrimitiveNode: widgets_values[0] = значение (текст для voice workflow)
+            elif node_type == "PrimitiveNode":
+                if len(widgets) >= 1:
+                    # Проверяем тип выхода - если STRING, это текст
+                    outputs = node.get("outputs", [])
+                    if any(output.get("type") == "STRING" for output in outputs):
+                        flat_node["inputs"]["text"] = widgets[0]
+            # Для AILab_Qwen3TTSVoiceInstruct: widgets_values[0] = gender, [1] = style, [2] = description
+            elif node_type == "AILab_Qwen3TTSVoiceInstruct":
+                if len(widgets) >= 1:
+                    flat_node["inputs"]["gender"] = widgets[0]
+                if len(widgets) >= 2:
+                    flat_node["inputs"]["style"] = widgets[1]
+                if len(widgets) >= 3:
+                    flat_node["inputs"]["description"] = widgets[2]
+            # Для AILab_Qwen3TTSVoiceDesign_Advanced: widgets_values содержат параметры модели
+            # Порядок из workflow: [text_placeholder, instruct_placeholder, model_size, device, dtype, ...]
+            # Но text и instruct приходят через inputs (связи), не через widgets_values
+            # widgets_values[0] и [1] - это плейсхолдеры, реальные значения приходят через связи
+            elif node_type == "AILab_Qwen3TTSVoiceDesign_Advanced":
+                # Пропускаем первые два (text и instruct - приходят через связи)
+                # Начинаем с индекса 2: model_size, device, dtype и т.д.
+                if len(widgets) >= 3:
+                    flat_node["inputs"]["model_size"] = widgets[2]
+                if len(widgets) >= 4:
+                    flat_node["inputs"]["device"] = widgets[3]
+                if len(widgets) >= 5:
+                    flat_node["inputs"]["dtype"] = widgets[4]
+                # Остальные параметры добавляем по порядку, если они есть
+                # Но нужно проверить реальную структуру ноды
+            # Для SaveAudio: widgets_values[0] = filename_prefix
+            elif node_type == "SaveAudio":
+                if len(widgets) >= 1:
+                    flat_node["inputs"]["filename_prefix"] = widgets[0]
             # Для KSamplerAdvanced: widgets_values содержат параметры в определенном порядке
             elif node_type == "KSamplerAdvanced":
                 # Порядок: [add_noise, seed, randomize, steps, cfg, sampler_name, scheduler, start_at_step, end_at_step, return_with_leftover_noise]
@@ -322,6 +358,18 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                     elif to_slot == 1:
                         input_name = "filename_prefix"
                     # codec и format обычно задаются через widgets_values
+                elif node_type == "AILab_Qwen3TTSVoiceDesign_Advanced":
+                    # Входы: text (slot 0), instruct (slot 1)
+                    if to_slot == 0:
+                        input_name = "text"
+                    elif to_slot == 1:
+                        input_name = "instruct"
+                elif node_type == "SaveAudio":
+                    if to_slot == 0:
+                        input_name = "audio"
+                elif node_type == "PreviewAudio":
+                    if to_slot == 0:
+                        input_name = "audio"
                 
                 if input_name:
                     flat_node["inputs"][input_name] = [str(from_node_id), from_slot]
