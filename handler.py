@@ -255,9 +255,16 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                 if len(widgets) >= 8:
                     flat_node["inputs"]["do_sample"] = widgets[7]
                 if len(widgets) >= 9:
-                    # Для voice workflow используем более низкую temperature для стабильности голоса
-                    # Но если это voice workflow, используем значение из widgets (обычно 0.88)
-                    flat_node["inputs"]["temperature"] = widgets[8]
+                    # Для voice workflow используем немного повышенную temperature для более естественного звучания
+                    # Увеличиваем с 0.88 до 0.92 для более живого и менее роботизированного голоса
+                    original_temp = widgets[8]
+                    if isinstance(original_temp, (int, float)) and original_temp < 0.95:
+                        # Немного повышаем temperature для более естественного звучания
+                        adjusted_temp = min(0.95, original_temp + 0.04)
+                        flat_node["inputs"]["temperature"] = adjusted_temp
+                        print(f"✅ Temperature скорректирована для более естественного голоса: {original_temp} -> {adjusted_temp}")
+                    else:
+                        flat_node["inputs"]["temperature"] = original_temp
                 if len(widgets) >= 10:
                     flat_node["inputs"]["top_p"] = widgets[9]
                 if len(widgets) >= 11:
