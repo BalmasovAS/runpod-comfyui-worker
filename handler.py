@@ -267,11 +267,12 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                 if len(widgets) >= 14:
                     flat_node["inputs"]["unload_models"] = widgets[13]
                 if len(widgets) >= 15:
+                    # Для voice workflow всегда используем фиксированный seed для стабильного голоса
                     # seed может быть числом или "randomize"
                     seed_value = widgets[14]
                     if isinstance(seed_value, str) and seed_value.lower() == "randomize":
-                        import random
-                        seed_value = random.randint(0, 2**32 - 1)
+                        # Фиксированный seed для стабильного голоса
+                        seed_value = 42
                     flat_node["inputs"]["seed"] = seed_value
             # Для SaveAudio: widgets_values[0] = filename_prefix
             elif node_type == "SaveAudio":
