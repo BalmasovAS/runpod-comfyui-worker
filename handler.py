@@ -1315,7 +1315,26 @@ def handler(job):
                         if "audio" in node_output:
                             print(f"  🎵 Найдено аудио в узле {node_id}")
                             audio_info = node_output["audio"]
-                            filename = audio_info["filename"]
+                            
+                            # audio может быть списком или словарем
+                            if isinstance(audio_info, list):
+                                # Если это список, берем первый элемент
+                                if len(audio_info) > 0:
+                                    audio_info = audio_info[0]
+                                else:
+                                    print(f"    ⚠️ Список audio пуст, пропускаю")
+                                    continue
+                            
+                            # Проверяем, что audio_info - словарь
+                            if not isinstance(audio_info, dict):
+                                print(f"    ⚠️ audio_info не является словарем: {type(audio_info)}, пропускаю")
+                                continue
+                            
+                            filename = audio_info.get("filename") or audio_info.get("name")
+                            if not filename:
+                                print(f"    ⚠️ Не удалось найти filename в audio_info: {audio_info}")
+                                continue
+                            
                             subfolder = audio_info.get("subfolder", "")
                             folder_type = audio_info.get("type", "output")
                             
