@@ -234,20 +234,43 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                 if len(widgets) >= 3:
                     flat_node["inputs"]["description"] = widgets[2]
             # Для AILab_Qwen3TTSVoiceDesign_Advanced: widgets_values содержат параметры модели
-            # Порядок из workflow: [text_placeholder, instruct_placeholder, model_size, device, dtype, ...]
+            # Порядок из workflow: [text_placeholder, instruct_placeholder, model_size, device, dtype, language, max_new_tokens, do_sample, temperature, top_p, top_k, repetition_penalty, attention_backend, unload_models, seed]
             # Но text и instruct приходят через inputs (связи), не через widgets_values
             # widgets_values[0] и [1] - это плейсхолдеры, реальные значения приходят через связи
             elif node_type == "AILab_Qwen3TTSVoiceDesign_Advanced":
                 # Пропускаем первые два (text и instruct - приходят через связи)
-                # Начинаем с индекса 2: model_size, device, dtype и т.д.
+                # Начинаем с индекса 2: model_size, device, dtype, language и т.д.
                 if len(widgets) >= 3:
                     flat_node["inputs"]["model_size"] = widgets[2]
                 if len(widgets) >= 4:
                     flat_node["inputs"]["device"] = widgets[3]
                 if len(widgets) >= 5:
                     flat_node["inputs"]["dtype"] = widgets[4]
-                # Остальные параметры добавляем по порядку, если они есть
-                # Но нужно проверить реальную структуру ноды
+                if len(widgets) >= 6:
+                    flat_node["inputs"]["language"] = widgets[5]
+                if len(widgets) >= 7:
+                    flat_node["inputs"]["max_new_tokens"] = widgets[6]
+                if len(widgets) >= 8:
+                    flat_node["inputs"]["do_sample"] = widgets[7]
+                if len(widgets) >= 9:
+                    flat_node["inputs"]["temperature"] = widgets[8]
+                if len(widgets) >= 10:
+                    flat_node["inputs"]["top_p"] = widgets[9]
+                if len(widgets) >= 11:
+                    flat_node["inputs"]["top_k"] = widgets[10]
+                if len(widgets) >= 12:
+                    flat_node["inputs"]["repetition_penalty"] = widgets[11]
+                if len(widgets) >= 13:
+                    flat_node["inputs"]["attention_backend"] = widgets[12]
+                if len(widgets) >= 14:
+                    flat_node["inputs"]["unload_models"] = widgets[13]
+                if len(widgets) >= 15:
+                    # seed может быть числом или "randomize"
+                    seed_value = widgets[14]
+                    if isinstance(seed_value, str) and seed_value.lower() == "randomize":
+                        import random
+                        seed_value = random.randint(0, 2**32 - 1)
+                    flat_node["inputs"]["seed"] = seed_value
             # Для SaveAudio: widgets_values[0] = filename_prefix
             elif node_type == "SaveAudio":
                 if len(widgets) >= 1:
