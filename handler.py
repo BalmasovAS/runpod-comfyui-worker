@@ -896,7 +896,7 @@ def handler(job):
                     required_nodes = ["PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo", "WanImageToVideo"]
                 elif workflow_type == "voice":
                     required_nodes = ["AILab_Qwen3TTSVoiceInstruct", "AILab_Qwen3TTSVoiceDesign_Advanced", "SaveAudio", "PreviewAudio"]
-                    # PrimitiveNode опционален - если его нет, текст передадим напрямую
+                    # PrimitiveNode опционален - если его нет, текст передадим напрямую в AILab_Qwen3TTSVoiceDesign_Advanced
                 else:  # photo
                     required_nodes = ["PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo"]
                 
