@@ -779,9 +779,22 @@ def apply_voice_params_to_nodes(nodes, params):
                     print(f"✅ Seed установлен в узле '{node.get('id')}': {fixed_seed}")
                 break
     
+    # Обновляем temperature для AILab_Qwen3TTSVoiceDesign_Advanced
+    if "voice_temperature" in params:
+        voice_temp = params.get("voice_temperature")
+        for node in nodes:
+            if node.get("type") == "AILab_Qwen3TTSVoiceDesign_Advanced":
+                widgets = node.get("widgets_values", [])
+                # widgets_values[8] = temperature (индекс 8 согласно порядку в workflow)
+                if len(widgets) >= 9:
+                    widgets[8] = voice_temp
+                    node["widgets_values"] = widgets
+                    print(f"✅ Temperature обновлена в узле '{node.get('id')}': {voice_temp}")
+                break
+    
     # Обновляем другие параметры универсально
     for param_key, param_value in params.items():
-        if param_key in ["prompt", "text", "voice_gender", "voice_style", "voice_description"]:
+        if param_key in ["prompt", "text", "voice_gender", "voice_style", "voice_description", "voice_seed", "voice_temperature"]:
             continue  # Уже обработали
         # Ищем узлы с этим параметром в inputs или widgets_values
         for node in nodes:
