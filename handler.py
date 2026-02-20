@@ -1026,9 +1026,9 @@ def handler(job):
                 if text_to_speak:
                     # Вычисляем max_new_tokens на основе длины текста
                     # Примерно 1 токен = 4 символа, умножаем на 1.5 для запаса
-                    # Минимум 64, максимум 512 для коротких сообщений
+                    # Минимум 256 (требование модели), максимум 512 для коротких сообщений
                     text_length = len(text_to_speak)
-                    calculated_tokens = max(64, min(512, int(text_length / 4 * 1.5)))
+                    calculated_tokens = max(256, min(512, int(text_length / 4 * 1.5)))
                     print(f"📊 Длина текста: {text_length} символов, вычислен max_new_tokens: {calculated_tokens}")
                     
                     # Фиксированный seed для стабильного голоса
@@ -1225,9 +1225,9 @@ def handler(job):
                 if text_to_speak:
                     # Вычисляем max_new_tokens на основе длины текста
                     # Примерно 1 токен = 4 символа, умножаем на 1.5 для запаса
-                    # Минимум 64, максимум 512 для коротких сообщений
+                    # Минимум 256 (требование модели), максимум 512 для коротких сообщений
                     text_length = len(text_to_speak)
-                    calculated_tokens = max(64, min(512, int(text_length / 4 * 1.5)))
+                    calculated_tokens = max(256, min(512, int(text_length / 4 * 1.5)))
                     print(f"📊 Длина текста: {text_length} символов, вычислен max_new_tokens: {calculated_tokens}")
                     
                     # Фиксированный seed для стабильного голоса
