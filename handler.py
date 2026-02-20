@@ -996,22 +996,44 @@ def handler(job):
                     text_to_speak = None
                 
                 if text_to_speak:
-                    # Ищем все узлы, которые ссылаются на PrimitiveNode, и передаем текст напрямую
+                    # Ищем все узлы AILab_Qwen3TTSVoiceDesign_Advanced и передаем текст напрямую
                     for node_id, node_data in workflow_to_send.items():
                         if isinstance(node_data, dict):
-                            inputs = node_data.get("inputs", {})
-                            # Проверяем все входы, которые могут быть ссылками на PrimitiveNode
-                            for input_name, input_value in inputs.items():
-                                if isinstance(input_value, list) and len(input_value) >= 1:
-                                    ref_node_id = str(input_value[0])
-                                    # Если это ссылка на пропущенный PrimitiveNode, заменяем на прямой текст
-                                    if ref_node_id in primitive_texts:
-                                        node_data["inputs"][input_name] = primitive_texts[ref_node_id]
-                                        print(f"✅ Текст передан напрямую в {node_data.get('class_type', 'unknown')} (узел {node_id}, вход {input_name}): {primitive_texts[ref_node_id][:50]}...")
-                                    # Также проверяем, если это ссылка на несуществующий узел (PrimitiveNode)
-                                    elif ref_node_id not in workflow_to_send and input_name == "text":
-                                        node_data["inputs"][input_name] = text_to_speak
-                                        print(f"✅ Текст передан напрямую в {node_data.get('class_type', 'unknown')} (узел {node_id}): {text_to_speak[:50]}...")
+                            class_type = node_data.get("class_type", "")
+                            # Для AILab_Qwen3TTSVoiceDesign_Advanced обязательно устанавливаем text из параметров
+                            if class_type == "AILab_Qwen3TTSVoiceDesign_Advanced":
+                                inputs = node_data.get("inputs", {})
+                                # Убеждаемся, что text установлен из параметров, а не из плейсхолдера
+                                if "text" in inputs:
+                                    # Если text - это ссылка на несуществующий узел, заменяем на прямой текст
+                                    text_input = inputs.get("text")
+                                    if isinstance(text_input, list) and len(text_input) >= 1:
+                                        ref_node_id = str(text_input[0])
+                                        if ref_node_id not in workflow_to_send or ref_node_id in primitive_texts:
+                                            node_data["inputs"]["text"] = text_to_speak
+                                            print(f"✅ Текст передан напрямую в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {text_to_speak[:50]}...")
+                                    elif isinstance(text_input, str) and len(text_input) > 200:
+                                        # Если text слишком длинный (плейсхолдер), заменяем на реальный текст
+                                        node_data["inputs"]["text"] = text_to_speak
+                                        print(f"✅ Текст заменен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {text_to_speak[:50]}...")
+                                else:
+                                    # Если text не установлен, устанавливаем из параметров
+                                    node_data["inputs"]["text"] = text_to_speak
+                                    print(f"✅ Текст установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {text_to_speak[:50]}...")
+                            else:
+                                # Для других узлов проверяем связи на PrimitiveNode
+                                inputs = node_data.get("inputs", {})
+                                for input_name, input_value in inputs.items():
+                                    if isinstance(input_value, list) and len(input_value) >= 1:
+                                        ref_node_id = str(input_value[0])
+                                        # Если это ссылка на пропущенный PrimitiveNode, заменяем на прямой текст
+                                        if ref_node_id in primitive_texts:
+                                            node_data["inputs"][input_name] = primitive_texts[ref_node_id]
+                                            print(f"✅ Текст передан напрямую в {class_type} (узел {node_id}, вход {input_name}): {primitive_texts[ref_node_id][:50]}...")
+                                        # Также проверяем, если это ссылка на несуществующий узел (PrimitiveNode)
+                                        elif ref_node_id not in workflow_to_send and input_name == "text":
+                                            node_data["inputs"][input_name] = text_to_speak
+                                            print(f"✅ Текст передан напрямую в {class_type} (узел {node_id}): {text_to_speak[:50]}...")
             
             print(f"📤 Отправляю workflow в ComfyUI (узлов: {len(workflow_to_send)})")
         else:
@@ -1153,22 +1175,44 @@ def handler(job):
                     text_to_speak = None
                 
                 if text_to_speak:
-                    # Ищем все узлы, которые ссылаются на PrimitiveNode, и передаем текст напрямую
+                    # Ищем все узлы AILab_Qwen3TTSVoiceDesign_Advanced и передаем текст напрямую
                     for node_id, node_data in workflow_to_send.items():
                         if isinstance(node_data, dict):
-                            inputs = node_data.get("inputs", {})
-                            # Проверяем все входы, которые могут быть ссылками на PrimitiveNode
-                            for input_name, input_value in inputs.items():
-                                if isinstance(input_value, list) and len(input_value) >= 1:
-                                    ref_node_id = str(input_value[0])
-                                    # Если это ссылка на пропущенный PrimitiveNode, заменяем на прямой текст
-                                    if ref_node_id in primitive_texts:
-                                        node_data["inputs"][input_name] = primitive_texts[ref_node_id]
-                                        print(f"✅ Текст передан напрямую в {node_data.get('class_type', 'unknown')} (узел {node_id}, вход {input_name}): {primitive_texts[ref_node_id][:50]}...")
-                                    # Также проверяем, если это ссылка на несуществующий узел (PrimitiveNode)
-                                    elif ref_node_id not in workflow_to_send and input_name == "text":
-                                        node_data["inputs"][input_name] = text_to_speak
-                                        print(f"✅ Текст передан напрямую в {node_data.get('class_type', 'unknown')} (узел {node_id}): {text_to_speak[:50]}...")
+                            class_type = node_data.get("class_type", "")
+                            # Для AILab_Qwen3TTSVoiceDesign_Advanced обязательно устанавливаем text из параметров
+                            if class_type == "AILab_Qwen3TTSVoiceDesign_Advanced":
+                                inputs = node_data.get("inputs", {})
+                                # Убеждаемся, что text установлен из параметров, а не из плейсхолдера
+                                if "text" in inputs:
+                                    # Если text - это ссылка на несуществующий узел, заменяем на прямой текст
+                                    text_input = inputs.get("text")
+                                    if isinstance(text_input, list) and len(text_input) >= 1:
+                                        ref_node_id = str(text_input[0])
+                                        if ref_node_id not in workflow_to_send or ref_node_id in primitive_texts:
+                                            node_data["inputs"]["text"] = text_to_speak
+                                            print(f"✅ Текст передан напрямую в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {text_to_speak[:50]}...")
+                                    elif isinstance(text_input, str) and len(text_input) > 200:
+                                        # Если text слишком длинный (плейсхолдер), заменяем на реальный текст
+                                        node_data["inputs"]["text"] = text_to_speak
+                                        print(f"✅ Текст заменен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {text_to_speak[:50]}...")
+                                else:
+                                    # Если text не установлен, устанавливаем из параметров
+                                    node_data["inputs"]["text"] = text_to_speak
+                                    print(f"✅ Текст установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {text_to_speak[:50]}...")
+                            else:
+                                # Для других узлов проверяем связи на PrimitiveNode
+                                inputs = node_data.get("inputs", {})
+                                for input_name, input_value in inputs.items():
+                                    if isinstance(input_value, list) and len(input_value) >= 1:
+                                        ref_node_id = str(input_value[0])
+                                        # Если это ссылка на пропущенный PrimitiveNode, заменяем на прямой текст
+                                        if ref_node_id in primitive_texts:
+                                            node_data["inputs"][input_name] = primitive_texts[ref_node_id]
+                                            print(f"✅ Текст передан напрямую в {class_type} (узел {node_id}, вход {input_name}): {primitive_texts[ref_node_id][:50]}...")
+                                        # Также проверяем, если это ссылка на несуществующий узел (PrimitiveNode)
+                                        elif ref_node_id not in workflow_to_send and input_name == "text":
+                                            node_data["inputs"][input_name] = text_to_speak
+                                            print(f"✅ Текст передан напрямую в {class_type} (узел {node_id}): {text_to_speak[:50]}...")
             
             print(f"📤 Отправляю workflow в ComfyUI (узлов: {len(workflow_to_send)})")
         else:
