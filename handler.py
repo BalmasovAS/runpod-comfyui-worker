@@ -996,6 +996,13 @@ def handler(job):
                     text_to_speak = None
                 
                 if text_to_speak:
+                    # Вычисляем max_new_tokens на основе длины текста
+                    # Примерно 1 токен = 4 символа, умножаем на 1.5 для запаса
+                    # Минимум 64, максимум 512 для коротких сообщений
+                    text_length = len(text_to_speak)
+                    calculated_tokens = max(64, min(512, int(text_length / 4 * 1.5)))
+                    print(f"📊 Длина текста: {text_length} символов, вычислен max_new_tokens: {calculated_tokens}")
+                    
                     # Ищем все узлы AILab_Qwen3TTSVoiceDesign_Advanced и передаем текст напрямую
                     for node_id, node_data in workflow_to_send.items():
                         if isinstance(node_data, dict):
@@ -1020,6 +1027,11 @@ def handler(job):
                                     # Если text не установлен, устанавливаем из параметров
                                     node_data["inputs"]["text"] = text_to_speak
                                     print(f"✅ Текст установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {text_to_speak[:50]}...")
+                                
+                                # Обновляем max_new_tokens на основе длины текста
+                                if "max_new_tokens" in inputs:
+                                    node_data["inputs"]["max_new_tokens"] = calculated_tokens
+                                    print(f"✅ max_new_tokens обновлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {calculated_tokens}")
                             else:
                                 # Для других узлов проверяем связи на PrimitiveNode
                                 inputs = node_data.get("inputs", {})
@@ -1175,6 +1187,13 @@ def handler(job):
                     text_to_speak = None
                 
                 if text_to_speak:
+                    # Вычисляем max_new_tokens на основе длины текста
+                    # Примерно 1 токен = 4 символа, умножаем на 1.5 для запаса
+                    # Минимум 64, максимум 512 для коротких сообщений
+                    text_length = len(text_to_speak)
+                    calculated_tokens = max(64, min(512, int(text_length / 4 * 1.5)))
+                    print(f"📊 Длина текста: {text_length} символов, вычислен max_new_tokens: {calculated_tokens}")
+                    
                     # Ищем все узлы AILab_Qwen3TTSVoiceDesign_Advanced и передаем текст напрямую
                     for node_id, node_data in workflow_to_send.items():
                         if isinstance(node_data, dict):
@@ -1199,6 +1218,11 @@ def handler(job):
                                     # Если text не установлен, устанавливаем из параметров
                                     node_data["inputs"]["text"] = text_to_speak
                                     print(f"✅ Текст установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {text_to_speak[:50]}...")
+                                
+                                # Обновляем max_new_tokens на основе длины текста
+                                if "max_new_tokens" in inputs:
+                                    node_data["inputs"]["max_new_tokens"] = calculated_tokens
+                                    print(f"✅ max_new_tokens обновлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {calculated_tokens}")
                             else:
                                 # Для других узлов проверяем связи на PrimitiveNode
                                 inputs = node_data.get("inputs", {})
