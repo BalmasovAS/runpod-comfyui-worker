@@ -636,20 +636,39 @@ def apply_video_params_to_nodes(nodes, params):
 
 def apply_voice_params_to_nodes(nodes, params):
     """Применяет параметры для голоса к формату с nodes"""
-    # Обновляем промпт (если есть)
-    if "prompt" in params:
-        prompt_text = params["prompt"]
+    # Обновляем текст для озвучки (PrimitiveNode с типом STRING)
+    if "text" in params or "prompt" in params:
+        text_to_speak = params.get("text") or params.get("prompt", "")
         for node in nodes:
-            if node.get("type") == "CLIPTextEncode" or "text" in str(node.get("type", "")).lower():
-                if "widgets_values" in node and len(node["widgets_values"]) > 0:
-                    node["widgets_values"][0] = prompt_text
-                    print(f"✅ Промпт обновлен в узле '{node.get('id')}': {prompt_text[:100]}...")
-                    break
+            # Ищем PrimitiveNode с выходом STRING (это узел для ввода текста)
+            if node.get("type") == "PrimitiveNode":
+                # Проверяем, что это узел для текста (есть выход STRING)
+                outputs = node.get("outputs", [])
+                if any(output.get("type") == "STRING" for output in outputs):
+                    if "widgets_values" in node and len(node["widgets_values"]) > 0:
+                        node["widgets_values"][0] = text_to_speak
+                        print(f"✅ Текст для озвучки обновлен в узле '{node.get('id')}': {text_to_speak[:100]}...")
+                        break
+    
+    # Обновляем параметры голоса (gender, style, description) для AILab_Qwen3TTSVoiceInstruct
+    if "voice_gender" in params or "voice_style" in params or "voice_description" in params:
+        for node in nodes:
+            if node.get("type") == "AILab_Qwen3TTSVoiceInstruct":
+                widgets = node.get("widgets_values", [])
+                if len(widgets) >= 1 and "voice_gender" in params:
+                    widgets[0] = params["voice_gender"]
+                if len(widgets) >= 2 and "voice_style" in params:
+                    widgets[1] = params["voice_style"]
+                if len(widgets) >= 3 and "voice_description" in params:
+                    widgets[2] = params["voice_description"]
+                node["widgets_values"] = widgets
+                print(f"✅ Параметры голоса обновлены в узле '{node.get('id')}'")
+                break
     
     # Обновляем другие параметры универсально
     for param_key, param_value in params.items():
-        if param_key == "prompt":
-            continue
+        if param_key in ["prompt", "text", "voice_gender", "voice_style", "voice_description"]:
+            continue  # Уже обработали
         # Ищем узлы с этим параметром в inputs или widgets_values
         for node in nodes:
             if "inputs" in node and param_key in node["inputs"]:

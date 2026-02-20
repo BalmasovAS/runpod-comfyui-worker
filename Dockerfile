@@ -139,6 +139,11 @@ RUN echo "Installing custom ComfyUI nodes..." && \
     cd RES4LYF && \
     uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
     cd .. && \
+    echo "Cloning ComfyUI-QwenTTS..." && \
+    git clone https://github.com/AILab-CVC/ComfyUI-QwenTTS.git && \
+    cd ComfyUI-QwenTTS && \
+    uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
+    cd .. && \
     echo "✅ Custom nodes installed successfully"
 
 # Go back to the root
