@@ -222,10 +222,12 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                         print(f"📝 PrimitiveNode {node_id}: текст '{widgets[0][:50]}...' будет передан через связи")
                         # Пропускаем создание узла, текст будет передан через связи
                         continue
-            # Для AILab_Qwen3TTSVoiceInstruct: widgets_values[0] = gender, [1] = style, [2] = description
+            # Для AILab_Qwen3TTSVoiceInstruct: widgets_values[0] = character (или gender), [1] = style, [2] = description
+            # Согласно документации, может требоваться character вместо gender
             elif node_type == "AILab_Qwen3TTSVoiceInstruct":
                 if len(widgets) >= 1:
-                    flat_node["inputs"]["gender"] = widgets[0]
+                    # Пробуем character, если не работает - gender
+                    flat_node["inputs"]["character"] = widgets[0]
                 if len(widgets) >= 2:
                     flat_node["inputs"]["style"] = widgets[1]
                 if len(widgets) >= 3:
