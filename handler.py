@@ -718,6 +718,7 @@ def apply_video_params_to_nodes(nodes, params):
 def apply_voice_params_to_nodes(nodes, params):
     """Применяет параметры для голоса к формату с nodes"""
     # Обновляем текст для озвучки (PrimitiveNode с типом STRING)
+    text_to_speak = None
     if "text" in params or "prompt" in params:
         text_to_speak = params.get("text") or params.get("prompt", "")
         for node in nodes:
@@ -730,6 +731,13 @@ def apply_voice_params_to_nodes(nodes, params):
                         node["widgets_values"][0] = text_to_speak
                         print(f"✅ Текст для озвучки обновлен в узле '{node.get('id')}': {text_to_speak[:100]}...")
                         break
+    
+    # Вычисляем max_new_tokens на основе длины текста (если текст есть)
+    calculated_tokens = None
+    if text_to_speak:
+        text_length = len(text_to_speak)
+        calculated_tokens = max(64, min(512, int(text_length / 4 * 1.5)))
+        print(f"📊 Длина текста: {text_length} символов, вычислен max_new_tokens: {calculated_tokens}")
     
     # Обновляем параметры голоса (gender, style, description) для AILab_Qwen3TTSVoiceInstruct
     if "voice_gender" in params or "voice_style" in params or "voice_description" in params:
@@ -744,6 +752,18 @@ def apply_voice_params_to_nodes(nodes, params):
                     widgets[2] = params["voice_description"]
                 node["widgets_values"] = widgets
                 print(f"✅ Параметры голоса обновлены в узле '{node.get('id')}'")
+                break
+    
+    # Обновляем max_new_tokens для AILab_Qwen3TTSVoiceDesign_Advanced
+    if calculated_tokens is not None:
+        for node in nodes:
+            if node.get("type") == "AILab_Qwen3TTSVoiceDesign_Advanced":
+                widgets = node.get("widgets_values", [])
+                # widgets_values[6] = max_new_tokens (индекс 6 согласно порядку в workflow)
+                if len(widgets) >= 7:
+                    widgets[6] = calculated_tokens
+                    node["widgets_values"] = widgets
+                    print(f"✅ max_new_tokens обновлен в узле '{node.get('id')}': {calculated_tokens}")
                 break
     
     # Обновляем другие параметры универсально
