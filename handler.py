@@ -737,7 +737,8 @@ def apply_voice_params_to_nodes(nodes, params):
     calculated_tokens = None
     if text_to_speak:
         text_length = len(text_to_speak)
-        calculated_tokens = max(64, min(512, int(text_length / 4 * 1.5)))
+        # Минимум 256 (требование модели), максимум 512 для коротких сообщений
+        calculated_tokens = max(256, min(512, int(text_length / 4 * 1.5)))
         print(f"📊 Длина текста: {text_length} символов, вычислен max_new_tokens: {calculated_tokens}")
     
     # Обновляем параметры голоса (gender, style, description) для AILab_Qwen3TTSVoiceInstruct
