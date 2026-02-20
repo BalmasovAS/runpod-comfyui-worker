@@ -890,7 +890,7 @@ def handler(job):
                 if workflow_type == "video":
                     required_nodes = ["PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo", "WanImageToVideo"]
                 elif workflow_type == "voice":
-                    required_nodes = ["AILab_Qwen3TTSVoiceInstruct", "AILab_Qwen3TTSVoiceDesign_Advanced", "SaveAudio", "PreviewAudio"]
+                    required_nodes = ["AILab_Qwen3TTSVoiceInstruct", "AILab_Qwen3TTSVoiceDesign_Advanced", "SaveAudio", "PreviewAudio", "PrimitiveNode"]
                 else:  # photo
                     required_nodes = ["PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo"]
                 
