@@ -255,6 +255,8 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                 if len(widgets) >= 8:
                     flat_node["inputs"]["do_sample"] = widgets[7]
                 if len(widgets) >= 9:
+                    # Для voice workflow используем более низкую temperature для стабильности голоса
+                    # Но если это voice workflow, используем значение из widgets (обычно 0.88)
                     flat_node["inputs"]["temperature"] = widgets[8]
                 if len(widgets) >= 10:
                     flat_node["inputs"]["top_p"] = widgets[9]
@@ -752,8 +754,9 @@ def apply_voice_params_to_nodes(nodes, params):
                     widgets[1] = params["voice_style"]
                 if len(widgets) >= 3 and "voice_description" in params:
                     widgets[2] = params["voice_description"]
+                    print(f"✅ voice_description обновлен в узле '{node.get('id')}': {params['voice_description'][:100]}...")
                 node["widgets_values"] = widgets
-                print(f"✅ Параметры голоса обновлены в узле '{node.get('id')}'")
+                print(f"✅ Параметры голоса обновлены в узле '{node.get('id')}' (gender={widgets[0] if len(widgets) > 0 else 'N/A'}, style={widgets[1] if len(widgets) > 1 else 'N/A'})")
                 break
     
     # Обновляем max_new_tokens и seed для AILab_Qwen3TTSVoiceDesign_Advanced
