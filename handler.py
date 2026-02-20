@@ -211,12 +211,17 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                 if len(widgets) >= 4:
                     flat_node["inputs"]["batch_size"] = widgets[3]
             # Для PrimitiveNode: widgets_values[0] = значение (текст для voice workflow)
+            # Если PrimitiveNode не найден, пропускаем его и передадим текст напрямую в целевой узел
             elif node_type == "PrimitiveNode":
                 if len(widgets) >= 1:
                     # Проверяем тип выхода - если STRING, это текст
                     outputs = node.get("outputs", [])
                     if any(output.get("type") == "STRING" for output in outputs):
-                        flat_node["inputs"]["text"] = widgets[0]
+                        # Сохраняем текст для последующей передачи в целевой узел
+                        # Вместо создания узла, передадим текст напрямую через связи
+                        print(f"📝 PrimitiveNode {node_id}: текст '{widgets[0][:50]}...' будет передан через связи")
+                        # Пропускаем создание узла, текст будет передан через связи
+                        continue
             # Для AILab_Qwen3TTSVoiceInstruct: widgets_values[0] = gender, [1] = style, [2] = description
             elif node_type == "AILab_Qwen3TTSVoiceInstruct":
                 if len(widgets) >= 1:
@@ -890,7 +895,8 @@ def handler(job):
                 if workflow_type == "video":
                     required_nodes = ["PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo", "WanImageToVideo"]
                 elif workflow_type == "voice":
-                    required_nodes = ["AILab_Qwen3TTSVoiceInstruct", "AILab_Qwen3TTSVoiceDesign_Advanced", "SaveAudio", "PreviewAudio", "PrimitiveNode"]
+                    required_nodes = ["AILab_Qwen3TTSVoiceInstruct", "AILab_Qwen3TTSVoiceDesign_Advanced", "SaveAudio", "PreviewAudio"]
+                    # PrimitiveNode опционален - если его нет, текст передадим напрямую
                 else:  # photo
                     required_nodes = ["PathchSageAttentionKJ", "KSamplerAdvanced", "EmptyHunyuanLatentVideo"]
                 
