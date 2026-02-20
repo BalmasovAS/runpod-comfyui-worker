@@ -211,17 +211,18 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                 if len(widgets) >= 4:
                     flat_node["inputs"]["batch_size"] = widgets[3]
             # Для PrimitiveNode: widgets_values[0] = значение (текст для voice workflow)
-            # Если PrimitiveNode не найден, пропускаем его и передадим текст напрямую в целевой узел
+            # Создаем узел, чтобы связи работали, даже если PrimitiveNode не установлен
+            # После конвертации проверим и передадим текст напрямую, если узел не найден
             elif node_type == "PrimitiveNode":
                 if len(widgets) >= 1:
                     # Проверяем тип выхода - если STRING, это текст
                     outputs = node.get("outputs", [])
                     if any(output.get("type") == "STRING" for output in outputs):
-                        # Сохраняем текст для последующей передачи в целевой узел
-                        # Вместо создания узла, передадим текст напрямую через связи
-                        print(f"📝 PrimitiveNode {node_id}: текст '{widgets[0][:50]}...' будет передан через связи")
-                        # Пропускаем создание узла, текст будет передан через связи
-                        continue
+                        # Сохраняем текст в inputs для последующей передачи
+                        # Создаем узел, чтобы связи работали
+                        flat_node["inputs"]["value"] = widgets[0]
+                        print(f"📝 PrimitiveNode {node_id}: текст '{widgets[0][:50]}...' сохранен")
+                        # НЕ пропускаем - создаем узел для поддержки связей
             # Для AILab_Qwen3TTSVoiceInstruct: widgets_values[0] = character (или gender), [1] = style, [2] = description
             # Согласно документации, может требоваться character вместо gender
             elif node_type == "AILab_Qwen3TTSVoiceInstruct":
