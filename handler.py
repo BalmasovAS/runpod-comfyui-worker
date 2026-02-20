@@ -768,8 +768,8 @@ def apply_voice_params_to_nodes(nodes, params):
     
     # Обновляем max_new_tokens и seed для AILab_Qwen3TTSVoiceDesign_Advanced
     if calculated_tokens is not None:
-        # Фиксированный seed для стабильного голоса
-        fixed_seed = 42  # Всегда один и тот же голос
+        # Используем seed из параметров, если передан, иначе значение по умолчанию
+        fixed_seed = params.get("voice_seed", 42)  # По умолчанию 42 для стабильного голоса
         for node in nodes:
             if node.get("type") == "AILab_Qwen3TTSVoiceDesign_Advanced":
                 widgets = node.get("widgets_values", [])
@@ -782,7 +782,7 @@ def apply_voice_params_to_nodes(nodes, params):
                 if len(widgets) >= 15:
                     widgets[14] = fixed_seed
                     node["widgets_values"] = widgets
-                    print(f"✅ Seed зафиксирован в узле '{node.get('id')}': {fixed_seed}")
+                    print(f"✅ Seed установлен в узле '{node.get('id')}': {fixed_seed}")
                 break
     
     # Обновляем другие параметры универсально
