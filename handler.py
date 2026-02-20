@@ -211,18 +211,18 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                 if len(widgets) >= 4:
                     flat_node["inputs"]["batch_size"] = widgets[3]
             # Для PrimitiveNode: widgets_values[0] = значение (текст для voice workflow)
-            # Создаем узел, чтобы связи работали, даже если PrimitiveNode не установлен
-            # После конвертации проверим и передадим текст напрямую, если узел не найден
+            # НЕ создаем узел PrimitiveNode, так как он не установлен в ComfyUI
+            # Вместо этого пропускаем его и передадим текст напрямую в целевой узел после конвертации
             elif node_type == "PrimitiveNode":
                 if len(widgets) >= 1:
                     # Проверяем тип выхода - если STRING, это текст
                     outputs = node.get("outputs", [])
                     if any(output.get("type") == "STRING" for output in outputs):
-                        # Сохраняем текст в inputs для последующей передачи
-                        # Создаем узел, чтобы связи работали
-                        flat_node["inputs"]["value"] = widgets[0]
-                        print(f"📝 PrimitiveNode {node_id}: текст '{widgets[0][:50]}...' сохранен")
-                        # НЕ пропускаем - создаем узел для поддержки связей
+                        # Пропускаем создание узла - текст будет передан напрямую в целевой узел
+                        print(f"📝 PrimitiveNode {node_id}: пропускаю создание узла, текст '{widgets[0][:50]}...' будет передан напрямую")
+                        # Сохраняем текст в node для последующей передачи
+                        node["_text_value"] = widgets[0]
+                        continue
             # Для AILab_Qwen3TTSVoiceInstruct: widgets_values[0] = character (или gender), [1] = style, [2] = description
             # Согласно документации, может требоваться character вместо gender
             elif node_type == "AILab_Qwen3TTSVoiceInstruct":
@@ -951,6 +951,43 @@ def handler(job):
             # Конвертируем в плоский формат для ComfyUI API
             print(f"🔄 Конвертирую workflow из формата с nodes в плоский формат...")
             workflow_to_send = convert_nodes_to_flat_format(workflow_with_nodes)
+            
+            # Если PrimitiveNode был пропущен, передаем текст напрямую в узлы, которые на него ссылаются
+            if workflow_type == "voice":
+                # Собираем текст из всех PrimitiveNode, которые были пропущены
+                primitive_texts = {}
+                for node in workflow_with_nodes["nodes"]:
+                    if node.get("type") == "PrimitiveNode" and "_text_value" in node:
+                        node_id = str(node.get("id"))
+                        primitive_texts[node_id] = node["_text_value"]
+                
+                # Если есть текст из workflow_params, используем его
+                if "text" in workflow_params:
+                    text_to_speak = workflow_params.get("text", "")
+                elif primitive_texts:
+                    # Используем первый найденный текст из PrimitiveNode
+                    text_to_speak = list(primitive_texts.values())[0]
+                else:
+                    text_to_speak = None
+                
+                if text_to_speak:
+                    # Ищем все узлы, которые ссылаются на PrimitiveNode, и передаем текст напрямую
+                    for node_id, node_data in workflow_to_send.items():
+                        if isinstance(node_data, dict):
+                            inputs = node_data.get("inputs", {})
+                            # Проверяем все входы, которые могут быть ссылками на PrimitiveNode
+                            for input_name, input_value in inputs.items():
+                                if isinstance(input_value, list) and len(input_value) >= 1:
+                                    ref_node_id = str(input_value[0])
+                                    # Если это ссылка на пропущенный PrimitiveNode, заменяем на прямой текст
+                                    if ref_node_id in primitive_texts:
+                                        node_data["inputs"][input_name] = primitive_texts[ref_node_id]
+                                        print(f"✅ Текст передан напрямую в {node_data.get('class_type', 'unknown')} (узел {node_id}, вход {input_name}): {primitive_texts[ref_node_id][:50]}...")
+                                    # Также проверяем, если это ссылка на несуществующий узел (PrimitiveNode)
+                                    elif ref_node_id not in workflow_to_send and input_name == "text":
+                                        node_data["inputs"][input_name] = text_to_speak
+                                        print(f"✅ Текст передан напрямую в {node_data.get('class_type', 'unknown')} (узел {node_id}): {text_to_speak[:50]}...")
+            
             print(f"📤 Отправляю workflow в ComfyUI (узлов: {len(workflow_to_send)})")
         else:
             # Плоский формат - работаем напрямую
@@ -1071,6 +1108,43 @@ def handler(job):
             # Конвертируем в плоский формат для ComfyUI API
             print(f"🔄 Конвертирую workflow из формата с nodes в плоский формат...")
             workflow_to_send = convert_nodes_to_flat_format(workflow_with_nodes)
+            
+            # Если PrimitiveNode был пропущен, передаем текст напрямую в узлы, которые на него ссылаются
+            if workflow_type == "voice":
+                # Собираем текст из всех PrimitiveNode, которые были пропущены
+                primitive_texts = {}
+                for node in workflow_with_nodes["nodes"]:
+                    if node.get("type") == "PrimitiveNode" and "_text_value" in node:
+                        node_id = str(node.get("id"))
+                        primitive_texts[node_id] = node["_text_value"]
+                
+                # Если есть текст из workflow_params, используем его
+                if "text" in workflow_params:
+                    text_to_speak = workflow_params.get("text", "")
+                elif primitive_texts:
+                    # Используем первый найденный текст из PrimitiveNode
+                    text_to_speak = list(primitive_texts.values())[0]
+                else:
+                    text_to_speak = None
+                
+                if text_to_speak:
+                    # Ищем все узлы, которые ссылаются на PrimitiveNode, и передаем текст напрямую
+                    for node_id, node_data in workflow_to_send.items():
+                        if isinstance(node_data, dict):
+                            inputs = node_data.get("inputs", {})
+                            # Проверяем все входы, которые могут быть ссылками на PrimitiveNode
+                            for input_name, input_value in inputs.items():
+                                if isinstance(input_value, list) and len(input_value) >= 1:
+                                    ref_node_id = str(input_value[0])
+                                    # Если это ссылка на пропущенный PrimitiveNode, заменяем на прямой текст
+                                    if ref_node_id in primitive_texts:
+                                        node_data["inputs"][input_name] = primitive_texts[ref_node_id]
+                                        print(f"✅ Текст передан напрямую в {node_data.get('class_type', 'unknown')} (узел {node_id}, вход {input_name}): {primitive_texts[ref_node_id][:50]}...")
+                                    # Также проверяем, если это ссылка на несуществующий узел (PrimitiveNode)
+                                    elif ref_node_id not in workflow_to_send and input_name == "text":
+                                        node_data["inputs"][input_name] = text_to_speak
+                                        print(f"✅ Текст передан напрямую в {node_data.get('class_type', 'unknown')} (узел {node_id}): {text_to_speak[:50]}...")
+            
             print(f"📤 Отправляю workflow в ComfyUI (узлов: {len(workflow_to_send)})")
         else:
             # Плоский формат - работаем напрямую
