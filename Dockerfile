@@ -146,6 +146,11 @@ RUN echo "Installing custom ComfyUI nodes..." && \
     # Устанавливаем совместимые версии transformers согласно README репозитория
     uv pip install "transformers==4.57.3" "tokenizers<0.20" || echo "Transformers version installation failed" && \
     cd .. && \
+    echo "Cloning ComfyUI-Crystools (для PrimitiveNode)..." && \
+    git clone https://github.com/crystian/ComfyUI-Crystools.git || echo "ComfyUI-Crystools clone failed" && \
+    cd ComfyUI-Crystools && \
+    uv pip install -r requirements.txt || echo "No requirements.txt or installation failed" && \
+    cd .. && \
     echo "✅ Custom nodes installed successfully"
 
 # Go back to the root
