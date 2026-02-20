@@ -246,6 +246,8 @@ def convert_nodes_to_flat_format(workflow_with_nodes):
                     flat_node["inputs"]["device"] = widgets[3]
                 if len(widgets) >= 5:
                     flat_node["inputs"]["dtype"] = widgets[4]
+                    # precision может быть тем же, что и dtype, или отдельным параметром
+                    flat_node["inputs"]["precision"] = widgets[4]
                 if len(widgets) >= 6:
                     flat_node["inputs"]["language"] = widgets[5]
                 if len(widgets) >= 7:
