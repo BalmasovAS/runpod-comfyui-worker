@@ -1113,11 +1113,26 @@ def handler(job):
                                         node_data["inputs"]["seed"] = fixed_seed
                                     print(f"✅ Seed установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {fixed_seed}")
                                 
-                                # Устанавливаем temperature из параметров, если передан
+                                # Устанавливаем temperature, top_p, top_k, repetition_penalty из параметров, если переданы
                                 if "voice_temperature" in workflow_params and "temperature" in inputs:
                                     voice_temp = workflow_params.get("voice_temperature")
                                     node_data["inputs"]["temperature"] = voice_temp
                                     print(f"✅ Temperature установлена в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {voice_temp}")
+                                
+                                if "voice_top_p" in workflow_params and "top_p" in inputs:
+                                    voice_top_p = workflow_params.get("voice_top_p")
+                                    node_data["inputs"]["top_p"] = voice_top_p
+                                    print(f"✅ Top-p установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {voice_top_p}")
+                                
+                                if "voice_top_k" in workflow_params and "top_k" in inputs:
+                                    voice_top_k = workflow_params.get("voice_top_k")
+                                    node_data["inputs"]["top_k"] = voice_top_k
+                                    print(f"✅ Top-k установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {voice_top_k}")
+                                
+                                if "voice_repetition_penalty" in workflow_params and "repetition_penalty" in inputs:
+                                    voice_rep_penalty = workflow_params.get("voice_repetition_penalty")
+                                    node_data["inputs"]["repetition_penalty"] = voice_rep_penalty
+                                    print(f"✅ Repetition penalty установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {voice_rep_penalty}")
                             else:
                                 # Для других узлов проверяем связи на PrimitiveNode
                                 inputs = node_data.get("inputs", {})
@@ -1323,11 +1338,26 @@ def handler(job):
                                         node_data["inputs"]["seed"] = fixed_seed
                                     print(f"✅ Seed установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {fixed_seed}")
                                 
-                                # Устанавливаем temperature из параметров, если передан
+                                # Устанавливаем temperature, top_p, top_k, repetition_penalty из параметров, если переданы
                                 if "voice_temperature" in workflow_params and "temperature" in inputs:
                                     voice_temp = workflow_params.get("voice_temperature")
                                     node_data["inputs"]["temperature"] = voice_temp
                                     print(f"✅ Temperature установлена в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {voice_temp}")
+                                
+                                if "voice_top_p" in workflow_params and "top_p" in inputs:
+                                    voice_top_p = workflow_params.get("voice_top_p")
+                                    node_data["inputs"]["top_p"] = voice_top_p
+                                    print(f"✅ Top-p установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {voice_top_p}")
+                                
+                                if "voice_top_k" in workflow_params and "top_k" in inputs:
+                                    voice_top_k = workflow_params.get("voice_top_k")
+                                    node_data["inputs"]["top_k"] = voice_top_k
+                                    print(f"✅ Top-k установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {voice_top_k}")
+                                
+                                if "voice_repetition_penalty" in workflow_params and "repetition_penalty" in inputs:
+                                    voice_rep_penalty = workflow_params.get("voice_repetition_penalty")
+                                    node_data["inputs"]["repetition_penalty"] = voice_rep_penalty
+                                    print(f"✅ Repetition penalty установлен в AILab_Qwen3TTSVoiceDesign_Advanced (узел {node_id}): {voice_rep_penalty}")
                             else:
                                 # Для других узлов проверяем связи на PrimitiveNode
                                 inputs = node_data.get("inputs", {})
