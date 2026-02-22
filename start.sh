@@ -12,11 +12,12 @@ echo "worker-comfyui: Setting up model paths..."
 RUNPOD_VOLUME_PATH="${RUNPOD_VOLUME_PATH:-/runpod-volume}"
 
 # Create model directories in ComfyUI if they don't exist
-mkdir -p /comfyui/models/{loras,vae,diffusion_models,text_encoders,controlnet,upscale_models,unet}
+mkdir -p /comfyui/models/{loras,vae,diffusion_models,text_encoders,controlnet,upscale_models,unet,TTS}
 
 # Remove existing symlinks if they exist (from Dockerfile build)
 rm -f /comfyui/models/loras /comfyui/models/vae /comfyui/models/diffusion_models
 rm -f /comfyui/models/text_encoders /comfyui/models/controlnet /comfyui/models/upscale_models
+rm -f /comfyui/models/TTS
 
 # Create symbolic links to Network Volume (only if target exists)
 if [ -d "$RUNPOD_VOLUME_PATH/loras" ]; then
@@ -49,11 +50,25 @@ if [ -d "$RUNPOD_VOLUME_PATH/upscale_models" ]; then
     echo "  ✅ Linked upscale_models: $RUNPOD_VOLUME_PATH/upscale_models -> /comfyui/models/upscale_models"
 fi
 
+# TTS models (для QwenTTS и других TTS моделей)
+if [ -d "$RUNPOD_VOLUME_PATH/TTS" ]; then
+    # Создаем папку TTS в ComfyUI если её нет
+    mkdir -p /comfyui/models/TTS
+    # Создаем симлинк на всю папку TTS
+    ln -sf "$RUNPOD_VOLUME_PATH/TTS" /comfyui/models/TTS
+    echo "  ✅ Linked TTS: $RUNPOD_VOLUME_PATH/TTS -> /comfyui/models/TTS"
+elif [ -d "$RUNPOD_VOLUME_PATH/ComfyUI/models/TTS" ]; then
+    # Альтернативный путь: ComfyUI/models/TTS
+    mkdir -p /comfyui/models/TTS
+    ln -sf "$RUNPOD_VOLUME_PATH/ComfyUI/models/TTS" /comfyui/models/TTS
+    echo "  ✅ Linked TTS: $RUNPOD_VOLUME_PATH/ComfyUI/models/TTS -> /comfyui/models/TTS"
+fi
+
 # Check for ComfyUI/models structure on Network Volume
 if [ -d "$RUNPOD_VOLUME_PATH/ComfyUI/models" ]; then
     echo "  📁 Found ComfyUI/models structure on Network Volume"
     # Link subdirectories from ComfyUI/models
-    for subdir in loras vae checkpoints clip controlnet upscale_models unet diffusion_models; do
+    for subdir in loras vae checkpoints clip controlnet upscale_models unet diffusion_models TTS; do
         if [ -d "$RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir" ]; then
             # Map clip to text_encoders for ComfyUI
             if [ "$subdir" = "clip" ]; then
@@ -64,6 +79,12 @@ if [ -d "$RUNPOD_VOLUME_PATH/ComfyUI/models" ]; then
                 if [ ! -L /comfyui/models/diffusion_models ] || [ "$subdir" = "diffusion_models" ]; then
                     ln -sf "$RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir" /comfyui/models/diffusion_models
                     echo "  ✅ Linked $subdir -> diffusion_models: $RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir"
+                fi
+            elif [ "$subdir" = "TTS" ]; then
+                # Если TTS уже существует, не перезаписываем
+                if [ ! -L /comfyui/models/TTS ]; then
+                    ln -sf "$RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir" /comfyui/models/TTS
+                    echo "  ✅ Linked $subdir -> TTS: $RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir"
                 fi
             else
                 ln -sf "$RUNPOD_VOLUME_PATH/ComfyUI/models/$subdir" /comfyui/models/$subdir
