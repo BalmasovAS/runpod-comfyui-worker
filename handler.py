@@ -648,7 +648,7 @@ def apply_voice_params(workflow, params):
                     print(f"⚠️ Параметр '{param_key}' не найден напрямую, возможно нужен в widgets_values")
 
 def apply_photo_params(workflow, params):
-    """Применяет параметры для фото: prompt, negative_prompt, seed и т.д."""
+    """Применяет параметры для фото: prompt, negative_prompt, seed, width, height и т.д."""
     # Обновляем промпт
     if "prompt" in params:
         apply_prompt(workflow, params["prompt"], is_negative=False)
@@ -656,6 +656,31 @@ def apply_photo_params(workflow, params):
     # Обновляем negative prompt
     if "negative_prompt" in params:
         apply_prompt(workflow, params["negative_prompt"], is_negative=True)
+    
+    # Обновляем width и height для фото
+    if "width" in params or "height" in params:
+        width_value = int(params.get("width", 1024))
+        height_value = int(params.get("height", 1024))
+        
+        # Ищем узел EmptyLatentImage (создает латентное изображение заданного размера)
+        found_id, node_data = find_node_by_type(workflow, "EmptyLatentImage")
+        if found_id and "inputs" in workflow[found_id]:
+            if "width" in workflow[found_id]["inputs"]:
+                workflow[found_id]["inputs"]["width"] = width_value
+                print(f"✅ Width обновлен в узле EmptyLatentImage '{found_id}': {width_value}")
+            if "height" in workflow[found_id]["inputs"]:
+                workflow[found_id]["inputs"]["height"] = height_value
+                print(f"✅ Height обновлен в узле EmptyLatentImage '{found_id}': {height_value}")
+        else:
+            # Пробуем найти по параметру width или height
+            found_id, node_data = find_node_by_input(workflow, "width")
+            if found_id:
+                workflow[found_id]["inputs"]["width"] = width_value
+                print(f"✅ Width обновлен в узле '{found_id}': {width_value}")
+            found_id, node_data = find_node_by_input(workflow, "height")
+            if found_id:
+                workflow[found_id]["inputs"]["height"] = height_value
+                print(f"✅ Height обновлен в узле '{found_id}': {height_value}")
     
     # Обновляем seed
     if "seed" in params:
@@ -701,6 +726,35 @@ def apply_photo_params_to_nodes(nodes, params):
                         node["widgets_values"][0] = prompt_text
                         print(f"✅ Промпт обновлен в узле '{node.get('id')}': {prompt_text[:100]}...")
                         break
+    
+    # Обновляем width и height для фото
+    if "width" in params or "height" in params:
+        width_value = int(params.get("width", 1024))
+        height_value = int(params.get("height", 1024))
+        
+        # Ищем узел EmptyLatentImage (создает латентное изображение заданного размера)
+        for node in nodes:
+            if node.get("type") == "EmptyLatentImage":
+                widgets = node.get("widgets_values", [])
+                # Порядок для EmptyLatentImage: [width, height, batch_size]
+                if len(widgets) >= 1:
+                    widgets[0] = width_value
+                    print(f"✅ Width обновлен в узле EmptyLatentImage '{node.get('id')}': {width_value}")
+                if len(widgets) >= 2:
+                    widgets[1] = height_value
+                    print(f"✅ Height обновлен в узле EmptyLatentImage '{node.get('id')}': {height_value}")
+                node["widgets_values"] = widgets
+                break
+        else:
+            # Если EmptyLatentImage не найден, ищем по inputs
+            for node in nodes:
+                if "inputs" in node:
+                    if "width" in node["inputs"]:
+                        node["inputs"]["width"] = width_value
+                        print(f"✅ Width обновлен в узле '{node.get('id')}': {width_value}")
+                    if "height" in node["inputs"]:
+                        node["inputs"]["height"] = height_value
+                        print(f"✅ Height обновлен в узле '{node.get('id')}': {height_value}")
     
     # Обновляем negative prompt
     if "negative_prompt" in params:
