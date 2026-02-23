@@ -578,6 +578,46 @@ def apply_video_params(workflow, params):
                     print(f"✅ Length обновлен в узле '{found_id}': {length_value}")
                 else:
                     print("⚠️ Параметр length не найден в workflow")
+    
+    # Обновляем width (ширину видео)
+    if "width" in params:
+        width_value = int(params["width"])
+        # Ищем узел с width
+        found_id, node_data = find_node_by_input(workflow, "width")
+        if found_id:
+            workflow[found_id]["inputs"]["width"] = width_value
+            print(f"✅ Width обновлен в узле '{found_id}': {width_value}")
+        else:
+            # Пробуем найти по типу узла (EmptyHunyuanLatentVideo или WanImageToVideo)
+            for node_type in ["EmptyHunyuanLatentVideo", "WanImageToVideo"]:
+                found_id, _ = find_node_by_type(workflow, node_type)
+                if found_id and "inputs" in workflow[found_id]:
+                    if "width" in workflow[found_id]["inputs"]:
+                        workflow[found_id]["inputs"]["width"] = width_value
+                        print(f"✅ Width обновлен в узле '{found_id}' ({node_type}): {width_value}")
+                        break
+            else:
+                print("⚠️ Параметр width не найден в workflow")
+    
+    # Обновляем height (высоту видео)
+    if "height" in params:
+        height_value = int(params["height"])
+        # Ищем узел с height
+        found_id, node_data = find_node_by_input(workflow, "height")
+        if found_id:
+            workflow[found_id]["inputs"]["height"] = height_value
+            print(f"✅ Height обновлен в узле '{found_id}': {height_value}")
+        else:
+            # Пробуем найти по типу узла (EmptyHunyuanLatentVideo или WanImageToVideo)
+            for node_type in ["EmptyHunyuanLatentVideo", "WanImageToVideo"]:
+                found_id, _ = find_node_by_type(workflow, node_type)
+                if found_id and "inputs" in workflow[found_id]:
+                    if "height" in workflow[found_id]["inputs"]:
+                        workflow[found_id]["inputs"]["height"] = height_value
+                        print(f"✅ Height обновлен в узле '{found_id}' ({node_type}): {height_value}")
+                        break
+            else:
+                print("⚠️ Параметр height не найден в workflow")
 
 def apply_voice_params(workflow, params):
     """Применяет параметры для голоса: любые параметры"""
@@ -718,6 +758,26 @@ def apply_video_params_to_nodes(nodes, params):
     
     # Обновляем fps и length (если нужно)
     # Это зависит от структуры конкретного workflow
+    
+    # Обновляем width и height для узлов EmptyHunyuanLatentVideo или WanImageToVideo
+    if "width" in params or "height" in params:
+        width_value = int(params.get("width", 720))
+        height_value = int(params.get("height", 1280))
+        
+        for node in nodes:
+            node_type = node.get("type")
+            if node_type in ["EmptyHunyuanLatentVideo", "WanImageToVideo"]:
+                widgets = node.get("widgets_values", [])
+                # Порядок для EmptyHunyuanLatentVideo: [width, height, length, batch_size]
+                # Порядок для WanImageToVideo: [width, height, length, batch_size]
+                if len(widgets) >= 1:
+                    widgets[0] = width_value
+                    print(f"✅ Width обновлен в узле '{node.get('id')}' ({node_type}): {width_value}")
+                if len(widgets) >= 2:
+                    widgets[1] = height_value
+                    print(f"✅ Height обновлен в узле '{node.get('id')}' ({node_type}): {height_value}")
+                node["widgets_values"] = widgets
+                break
 
 def apply_voice_params_to_nodes(nodes, params):
     """Применяет параметры для голоса к формату с nodes"""
