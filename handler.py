@@ -578,7 +578,7 @@ def apply_video_params(workflow, params):
                     print(f"✅ Length обновлен в узле '{found_id}': {length_value}")
                 else:
                     print("⚠️ Параметр length не найден в workflow")
-    
+
     # Обновляем width (ширину видео)
     if "width" in params:
         width_value = int(params["width"])
