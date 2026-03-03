@@ -30,6 +30,17 @@ except Exception as e:
 
 # Стандартный путь к Network Volume в RunPod
 RUNPOD_VOLUME_PATH = os.environ.get("RUNPOD_VOLUME_PATH", "/runpod-volume")
+PHOTO_PROMPT_PREFIX = "eva_virtumate, Instagirl, l3n0v0"
+
+def prepend_photo_prompt_prefix(prompt_text):
+    """Добавляет обязательный префикс в positive prompt для фото."""
+    text = str(prompt_text or "").strip()
+    if not text:
+        return PHOTO_PROMPT_PREFIX
+    # Если уже начинается с нужного префикса, не дублируем.
+    if text.lower().startswith(PHOTO_PROMPT_PREFIX.lower()):
+        return text
+    return f"{PHOTO_PROMPT_PREFIX}, {text}"
 
 def convert_nodes_to_flat_format(workflow_with_nodes):
     """
@@ -652,7 +663,8 @@ def apply_photo_params(workflow, params):
     """Применяет параметры для фото: prompt, negative_prompt, seed, width, height и т.д."""
     # Обновляем промпт
     if "prompt" in params:
-        apply_prompt(workflow, params["prompt"], is_negative=False)
+        prompt_text = prepend_photo_prompt_prefix(params["prompt"])
+        apply_prompt(workflow, prompt_text, is_negative=False)
     
     # Обновляем negative prompt
     if "negative_prompt" in params:
@@ -717,7 +729,7 @@ def apply_photo_params_to_nodes(nodes, params):
     """Применяет параметры для фото к формату с nodes"""
     # Обновляем промпт (ищем CLIPTextEncode с title "Positive" или без "Negative")
     if "prompt" in params:
-        prompt_text = params["prompt"]
+        prompt_text = prepend_photo_prompt_prefix(params["prompt"])
         # Ищем узел CLIPTextEncode для positive prompt
         for node in nodes:
             if node.get("type") == "CLIPTextEncode":

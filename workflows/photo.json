@@ -1,7 +1,7 @@
 {
   "3": {
     "inputs": {
-      "text": "Close portrait of a young redhead woman with soft freckles and luminous green eyes, warm evening fairy lights in background creating circular golden bokeh, subtle glossy lips and natural radiant skin, gentle dreamy smile, shoulders slightly angled, head softly tilted, shot on 85mm lens at wide aperture, cinematic depth of field, warm color grading, ultra detailed skin texture, high-end Instagram aesthetic photography\n",
+      "text": "eva_virtumate, Instagirl, l3n0v0, Close portrait of a young redhead woman with soft freckles and luminous green eyes, warm evening fairy lights in background creating circular golden bokeh, subtle glossy lips and natural radiant skin, gentle dreamy smile, shoulders slightly angled, head softly tilted, shot on 85mm lens at wide aperture, cinematic depth of field, warm color grading, ultra detailed skin texture, high-end Instagram aesthetic photography\n",
       "clip": [
         "68",
         1
@@ -204,7 +204,7 @@
       "lora_name": "l3n0v0.safetensors",
       "strength_model": 0.6000000000000001,
       "model": [
-        "103",
+        "76",
         0
       ]
     },
@@ -236,7 +236,7 @@
       "lora_name": "2924854d-6b14-4ba6-ba2c-5dd13143e6e7-u1_3012091a-6233-4a5c-82ba-07f9351551c6.safetensors",
       "strength_model": 0.85,
       "model": [
-        "71",
+        "103",
         0
       ]
     },
@@ -248,9 +248,9 @@
   "103": {
     "inputs": {
       "lora_name": "WAN2.2-LowNoise_Pussyv1-I2V_T2V.safetensors",
-      "strength_model": 0.7,
+      "strength_model": 0.6,
       "model": [
-        "76",
+        "71",
         0
       ]
     },
