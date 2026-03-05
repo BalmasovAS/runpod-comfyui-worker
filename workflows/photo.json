@@ -188,7 +188,7 @@
   "71": {
     "inputs": {
       "lora_name": "Instagirlv2.5-LOW.safetensors",
-      "strength_model": 0.8000000000000002,
+      "strength_model": 0.81,
       "model": [
         "70",
         0
@@ -202,7 +202,7 @@
   "72": {
     "inputs": {
       "lora_name": "l3n0v0.safetensors",
-      "strength_model": 0.6000000000000001,
+      "strength_model": 0.6,
       "model": [
         "76",
         0
@@ -236,7 +236,7 @@
       "lora_name": "2924854d-6b14-4ba6-ba2c-5dd13143e6e7-u1_3012091a-6233-4a5c-82ba-07f9351551c6.safetensors",
       "strength_model": 0.85,
       "model": [
-        "103",
+        "104",
         0
       ]
     },
@@ -248,9 +248,23 @@
   "103": {
     "inputs": {
       "lora_name": "WAN2.2-LowNoise_Pussyv1-I2V_T2V.safetensors",
-      "strength_model": 0.6,
+      "strength_model": 0.59,
       "model": [
         "71",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Загрузчик LoRA (Только модель)"
+    }
+  },
+  "104": {
+    "inputs": {
+      "lora_name": "genitals_helper_v1.0_e219.safetensors",
+      "strength_model": 0.6,
+      "model": [
+        "103",
         0
       ]
     },
