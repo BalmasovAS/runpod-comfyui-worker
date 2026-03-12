@@ -112,6 +112,7 @@ WORKDIR /comfyui
 
 # Install custom nodes manually (more reliable than comfy-node-install)
 # These are the required custom nodes for this project
+# These are the required custom nodes for this project
 RUN echo "Installing custom ComfyUI nodes..." && \
     cd /comfyui/custom_nodes && \
     echo "Cloning ComfyUI-WanVideoWrapper..." && \
